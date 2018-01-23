@@ -1,113 +1,82 @@
 package main
 
 import (
-	
+	"bytes"
+	"context"
 	"fmt"
 	"io/ioutil"
+	"strings"
 
 	"github.com/google/go-github/github"
 	"golang.org/x/oauth2"
 )
+
 // you need to generate personal access token at
 // https://github.com/settings/applications#personal-access-tokens
 // Put your personal access token in pat.txt
 
-func setPersonalAccessToken() string {
-	fh, err := ioutil.ReadFile("pat.txt")
+type userdata struct {
+	name string
+	pat  string
+}
+
+func setUser() userdata {
+	fh, err := ioutil.ReadFile("user.txt")
 	if err != nil {
 		fmt.Print(err)
 	}
-	pat := string(fh)
-	//fmt.Println("Retrived pat: ",pat)
-	return pat
+	userInfo := strings.Split(string(fh), ",")
+	user := userdata{name: userInfo[0], pat: userInfo[1]}
+	// fmt.Printf("Retrieved user info: %s\n", user)
+	return user
 }
 
-type TokenSource struct {
-	AccessToken string
-}
-
-func (t *TokenSource) Token() (*oauth2.Token, error) {
-	token := &oauth2.Token{
-		AccessToken: t.AccessToken,
-	}
-	return token, nil
-}
-func getAll(){
-	client := github.NewClient(nil)
-
-	opt := &github.RepositoryListByOrgOptions{
-		ListOptions: github.ListOptions{PerPage: 10},
-	}
-	// get all pages of results
-	var allRepos []*github.Repository
-	for {
-		repos, resp, err := client.Repositories.ListByOrg("github", opt)
-		if err != nil {
-			//return err
-		}
-		allRepos = append(allRepos, repos...)
-		if resp.NextPage == 0 {
-			fmt.Printf("a page")
-			break
-			
-		}
-		opt.ListOptions.Page = resp.NextPage
-	}
-}
 func main() {
+	ctx := context.Background()
+	user := setUser()
+	ts := oauth2.StaticTokenSource(
+		&oauth2.Token{
+			AccessToken: user.pat,
+		},
+	)
+	authClient := oauth2.NewClient(ctx, ts)
+	client := github.NewClient(authClient)
 
-	personalAccessToken := setPersonalAccessToken()
-	tokenSource := &TokenSource{
-		AccessToken: personalAccessToken,
+	orgs, _, err := client.Organizations.List(ctx, user.name, nil)
+
+	if err == nil {
+		fmt.Print("Working...\n")
 	}
-	oauthClient := oauth2.NewClient(oauth2.NoContext, tokenSource)
-	client := github.NewClient(oauthClient)
-	
-	orgs, _, err := client.Organizations.List("leecalcote", nil)
-	
-	for _, org := range orgs {
-		if err !=nil {
-			fmt.Printf("Failed with %s\n", err)
-		return
-		}
-		fmt.Printf("Org: %s \n", *org.Login)
 
-	
-		repos, _, err := client.Repositories.List(*org.Login, nil)			
-		if err !=nil {
+	var buffer bytes.Buffer
+
+	for _, org := range orgs {
+		if err != nil {
+			fmt.Printf("Failed with %s\n", err)
+			return
+		}
+		buffer.WriteString(fmt.Sprint("Org: ", *org.Login, "\n"))
+
+		repos, _, err := client.Repositories.List(ctx, *org.Login, nil)
+		if err != nil {
 			fmt.Printf("Failed with %s\n", err)
 			return
 		}
 		for _, repo := range repos {
 			//fmt.Printf("Repo: %s \n", *repo.Owner.Login)
-			lics, _, err := client.Repositories.License(*repo.Owner.Login, *repo.Name)
+			lics, _, err := client.Repositories.License(ctx, *repo.Owner.Login, *repo.Name)
 			if err == nil {
-				fmt.Printf("  Repo: %s [%s] \n", *repo.Name, *lics.License.Name)
-				
+				// fmt.Printf("  Repo: %s [%s] \n", *repo.Name, *lics.License.Name)
+				buffer.WriteString(fmt.Sprint("  Repo: ", *repo.Name, " [", *lics.License.Name, "]\n"))
 			}
 		}
 	}
-	//getAll()
-	// for _, lic := range lics {
-    // 	fmt.Printf("Lic: %s\n", *lic.Name)
-    // }
-	//fmt.Printf("orgs:\n%s\n", string(orgs))
 
-	// user, _, err := client.Users.Get("")
-	// if err != nil {
-	// 	fmt.Printf("client.Users.Get() faled with '%s'\n", err)
-	// 	return
-	// }
-	// d, err := json.MarshalIndent(user, "", "  ")
-	// if err != nil {
-	// 	fmt.Printf("json.MarshlIndent() failed with %s\n", err)
-	// 	return
-	// }
-	// fmt.Printf("User:\n%s\n", string(d))
-	
-	
+	ioutil.WriteFile("list.txt", []byte(buffer.String()), 0644)
 
-	//func (s *RepositoriesService) License(owner, repo string) (*RepositoryLicense, *Response, error)
-	
-	//lics, _, err := client.Licenses.List()
+	if err != nil {
+		fmt.Printf("Failed to write to file with %s\n", err)
+	} else {
+		fmt.Print("List now available in list.txt\n")
+	}
 }
