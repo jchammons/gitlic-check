@@ -43,13 +43,13 @@ func main() {
 	client := github.NewClient(authClient)
 
 	orgs, _, err := client.Organizations.List(ctx, user.name, nil)
-
-	if err == nil {
-		fmt.Print("Working...\n")
+	if err != nil {
+		fmt.Printf("Failed with %s\n", err)
+		return
 	}
 
+	fmt.Print("Working...\n")
 	var buffer bytes.Buffer
-
 	for _, org := range orgs {
 		if err != nil {
 			fmt.Printf("Failed with %s\n", err)
@@ -63,11 +63,16 @@ func main() {
 			return
 		}
 		for _, repo := range repos {
-			//fmt.Printf("Repo: %s \n", *repo.Owner.Login)
-			lics, _, err := client.Repositories.License(ctx, *repo.Owner.Login, *repo.Name)
-			if err == nil {
-				// fmt.Printf("  Repo: %s [%s] \n", *repo.Name, *lics.License.Name)
-				buffer.WriteString(fmt.Sprint("  Repo: ", *repo.Name, " [", *lics.License.Name, "]\n"))
+			// fmt.Printf("  Repo: %s [%s] \n", *repo.Name, *lics.License.Name)
+			if *repo.Private == false {
+				buffer.WriteString(fmt.Sprint("  Repo: ", *repo.Name))
+
+				lics, _, err := client.Repositories.License(ctx, *repo.Owner.Login, *repo.Name)
+				if err != nil {
+					buffer.WriteString(" - No License\n")
+					continue
+				}
+				buffer.WriteString(fmt.Sprint(" [", *lics.License.Name, "]\n"))
 			}
 		}
 	}
@@ -76,7 +81,8 @@ func main() {
 
 	if err != nil {
 		fmt.Printf("Failed to write to file with %s\n", err)
-	} else {
-		fmt.Print("List now available in list.txt\n")
+		return
 	}
+
+	fmt.Print("List now available in list.txt\n")
 }
