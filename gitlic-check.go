@@ -50,13 +50,12 @@ func main() {
 
 	fmt.Print("Working...\n")
 	var buffer bytes.Buffer
+	buffer.WriteString("Org, Repo, License\n")
 	for _, org := range orgs {
 		if err != nil {
 			fmt.Printf("Failed with %s\n", err)
 			return
 		}
-		buffer.WriteString(fmt.Sprint("Org: ", *org.Login, "\n"))
-
 		repos, _, err := client.Repositories.List(ctx, *org.Login, nil)
 		if err != nil {
 			fmt.Printf("Failed with %s\n", err)
@@ -64,25 +63,22 @@ func main() {
 		}
 		for _, repo := range repos {
 			// fmt.Printf("  Repo: %s [%s] \n", *repo.Name, *lics.License.Name)
-			if *repo.Private == false {
-				buffer.WriteString(fmt.Sprint("  Repo: ", *repo.Name))
-
-				lics, _, err := client.Repositories.License(ctx, *repo.Owner.Login, *repo.Name)
-				if err != nil {
-					buffer.WriteString(" - No License\n")
-					continue
-				}
-				buffer.WriteString(fmt.Sprint(" [", *lics.License.Name, "]\n"))
+			buffer.WriteString(fmt.Sprint(*org.Login, ",", *repo.Name, ","))
+			lics, _, err := client.Repositories.License(ctx, *repo.Owner.Login, *repo.Name)
+			if err != nil {
+				buffer.WriteString("None\n")
+				continue
 			}
+			buffer.WriteString(fmt.Sprint(*lics.License.Name, "\n"))
 		}
 	}
 
-	ioutil.WriteFile("list.txt", []byte(buffer.String()), 0644)
+	ioutil.WriteFile("repos.csv", []byte(buffer.String()), 0644)
 
 	if err != nil {
 		fmt.Printf("Failed to write to file with %s\n", err)
 		return
 	}
 
-	fmt.Print("List now available in list.txt\n")
+	fmt.Print("List now available in repos.csv\n")
 }
