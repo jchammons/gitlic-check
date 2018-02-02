@@ -21,7 +21,7 @@ type userdata struct {
 }
 
 func setUser() userdata {
-	fh, err := ioutil.ReadFile("user.txt")
+	fh, err := ioutil.ReadFile("auth.txt")
 	if err != nil {
 		fmt.Print(err)
 	}
@@ -49,9 +49,14 @@ func main() {
 	}
 
 	fmt.Print("Working...\n")
-	var buffer bytes.Buffer
-	buffer.WriteString("Org, Repo, License\n")
+	var repoBuffer bytes.Buffer
+	var userBuffer bytes.Buffer
+
+	repoBuffer.WriteString("Org, Repo, License\n")
+	userBuffer.WriteString("Org, User, Two-Factor Enabled\n")
+
 	for _, org := range orgs {
+
 		if err != nil {
 			fmt.Printf("Failed with %s\n", err)
 			return
@@ -63,22 +68,43 @@ func main() {
 		}
 		for _, repo := range repos {
 			// fmt.Printf("  Repo: %s [%s] \n", *repo.Name, *lics.License.Name)
-			buffer.WriteString(fmt.Sprint(*org.Login, ",", *repo.Name, ","))
+			repoBuffer.WriteString(fmt.Sprint(*org.Login, ",", *repo.Name, ","))
 			lics, _, err := client.Repositories.License(ctx, *repo.Owner.Login, *repo.Name)
 			if err != nil {
-				buffer.WriteString("None\n")
+				repoBuffer.WriteString("None\n")
 				continue
 			}
-			buffer.WriteString(fmt.Sprint(*lics.License.Name, "\n"))
+			repoBuffer.WriteString(fmt.Sprint(*lics.License.Name, "\n"))
+		}
+
+		members, _, err := client.Organizations.ListMembers(ctx, *org.Login, nil)
+		membersNo2F, _, err := client.Organizations.ListMembers(ctx, *org.Login, &github.ListMembersOptions{Filter: "2fa_disabled"})
+		membersFilter := make(map[string]bool)
+
+		for _, member := range membersNo2F {
+			membersFilter[*member.Login] = true
+		}
+		if err != nil {
+			fmt.Printf("Failed with %s\n", err)
+			continue
+		}
+		for _, member := range members {
+			userBuffer.WriteString(fmt.Sprint(*org.Login, ",", *member.Login, ","))
+			if membersFilter[*member.Login] {
+				userBuffer.WriteString("False\n")
+				continue
+			}
+			userBuffer.WriteString("True\n")
 		}
 	}
 
-	ioutil.WriteFile("repos.csv", []byte(buffer.String()), 0644)
+	ioutil.WriteFile("repos.csv", []byte(repoBuffer.String()), 0644)
+	ioutil.WriteFile("users.csv", []byte(userBuffer.String()), 0644)
 
 	if err != nil {
 		fmt.Printf("Failed to write to file with %s\n", err)
 		return
 	}
 
-	fmt.Print("List now available in repos.csv\n")
+	fmt.Print("CSVs are now ready\n")
 }
