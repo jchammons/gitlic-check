@@ -44,7 +44,7 @@ func main() {
 
 	orgs, _, err := client.Organizations.List(ctx, user.name, nil)
 	if err != nil {
-		fmt.Printf("Failed with %s\n", err)
+		fmt.Printf("Organizations.List failed with %s\n", err)
 		return
 	}
 
@@ -57,18 +57,16 @@ func main() {
 
 	for _, org := range orgs {
 
-		if err != nil {
-			fmt.Printf("Failed with %s\n", err)
-			return
-		}
 		repos, _, err := client.Repositories.List(ctx, *org.Login, nil)
 		if err != nil {
-			fmt.Printf("Failed with %s\n", err)
+			fmt.Printf("Repositories.List failed with %s\n", err)
 			return
 		}
+
 		for _, repo := range repos {
 			// fmt.Printf("  Repo: %s [%s] \n", *repo.Name, *lics.License.Name)
 			repoBuffer.WriteString(fmt.Sprint(*org.Login, ",", *repo.Name, ","))
+
 			lics, _, err := client.Repositories.License(ctx, *repo.Owner.Login, *repo.Name)
 			if err != nil {
 				repoBuffer.WriteString("None\n")
@@ -78,16 +76,22 @@ func main() {
 		}
 
 		members, _, err := client.Organizations.ListMembers(ctx, *org.Login, nil)
-		membersNo2F, _, err := client.Organizations.ListMembers(ctx, *org.Login, &github.ListMembersOptions{Filter: "2fa_disabled"})
-		membersFilter := make(map[string]bool)
+		if err != nil {
+			fmt.Printf("Organizations.ListMembers, no filter, failed with %s\n", err)
+			continue
+		}
 
+		membersNo2F, _, err := client.Organizations.ListMembers(ctx, *org.Login, &github.ListMembersOptions{Filter: "2fa_disabled"})
+		if err != nil {
+			fmt.Printf("Organizations.ListMembers, 2FA filter, failed with %s\n", err)
+			continue
+		}
+
+		membersFilter := make(map[string]bool)
 		for _, member := range membersNo2F {
 			membersFilter[*member.Login] = true
 		}
-		if err != nil {
-			fmt.Printf("Failed with %s\n", err)
-			continue
-		}
+
 		for _, member := range members {
 			userBuffer.WriteString(fmt.Sprint(*org.Login, ",", *member.Login, ","))
 			if membersFilter[*member.Login] {
@@ -100,11 +104,6 @@ func main() {
 
 	ioutil.WriteFile("repos.csv", []byte(repoBuffer.String()), 0644)
 	ioutil.WriteFile("users.csv", []byte(userBuffer.String()), 0644)
-
-	if err != nil {
-		fmt.Printf("Failed to write to file with %s\n", err)
-		return
-	}
 
 	fmt.Print("CSVs are now ready\n")
 }
