@@ -13,21 +13,14 @@ import (
 )
 
 // Follow instructions in README for proper authentication
-
-type userdata struct {
-	name string
-	pat  string
-}
-
-func setUser() userdata {
+func getToken() string {
 	fh, err := ioutil.ReadFile("auth.txt")
 	if err != nil {
-		fmt.Print(err)
+		fmt.Printf("Failed to read PAT from auth.txt: %s", err)
 	}
-	userInfo := strings.Split(string(fh), ",")
-	user := userdata{name: userInfo[0], pat: userInfo[1]}
+	pat := string(fh)
 	// fmt.Printf("Retrieved user info: %s\n", user)
-	return user
+	return pat
 }
 
 func getIgnoredOrgs() map[string]bool {
@@ -63,23 +56,25 @@ func saveToFile(name string, data string) error {
 
 func main() {
 	ctx := context.Background()
-	user := setUser()
 	ignoredOrgs := getIgnoredOrgs()
 	ts := oauth2.StaticTokenSource(
 		&oauth2.Token{
-			AccessToken: user.pat,
+			AccessToken: getToken(),
 		},
 	)
 	authClient := oauth2.NewClient(ctx, ts)
 	client := github.NewClient(authClient)
 
-	orgs, _, err := client.Organizations.List(ctx, user.name, nil)
+	orgs, _, err := client.Organizations.List(ctx, "", nil)
 	if err != nil {
 		fmt.Printf("Organizations.List failed with %s\n", err)
 		return
 	}
 
-	fmt.Print("Working... This may take a minute or two.\n")
+	fmt.Print("Working")
+	fmt.Print(".")
+	fmt.Print(".")
+	fmt.Print(".\n")
 
 	os.Remove("repos.csv")
 	os.Remove("users.csv")
