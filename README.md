@@ -8,6 +8,8 @@ You'll need to generate a personal access token [in your settings](https://githu
 To exclude specific repositories from your reports, include their names separated by a comma in a file called "ignore.txt", which will be read into the tool.
 
 ### Sample Output
+>Note: Must be an owner of the org to pull data on private repos, members, and two-factor authentication
+
 _repos.csv_
 ```
 Org,Repo,Private,Fork,License 
@@ -15,8 +17,13 @@ org-name,repo-name,true,false,MIT License
 ```
 
 _users.csv_
->Note: Must be an owner of the org to pull data on private members and two-factor authentication
 ```
 Org,User,Two-Factor Enabled
 org-name,user-name,true
+```
+
+_invites.csv_
+```
+Org,User,Date Sent,Invited By
+org-name,user-name,2018-03-15,user-name
 ```

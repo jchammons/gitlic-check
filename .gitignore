@@ -1,5 +1,4 @@
-repos.csv
-users.csv
+output/
 auth.txt
 ignore.txt
 .DS_Store
