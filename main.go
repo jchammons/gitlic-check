@@ -80,7 +80,7 @@ func main() {
 		fmt.Printf("Initial save to users CSV failed with %s\n", err)
 	}
 
-	if _, err := fInvites.WriteString("Org,User,Date Sent,Invited By"); err != nil {
+	if _, err := fInvites.WriteString("Org,User,Date Sent,Invited By\n"); err != nil {
 		fmt.Printf("Initial save to invites CSV failed with %s\n", err)
 	}
 
@@ -135,8 +135,8 @@ func main() {
 			for _, invite := range invites {
 				// TODO Check invite date; if older than 2 weeks, call Organization
 				// Cancel Membership endpoint with user id
-				inviteDate := *invite.CreatedAt
-				if _, err := fInvites.WriteString(fmt.Sprint(*org.Login, ",", *invite.Login, ",", inviteDate.Format("%B %d, %Y"), ",", *invite.Inviter.Login, "\n")); err != nil {
+				inviteDate := fmt.Sprint(invite.CreatedAt.Year(), "-", invite.CreatedAt.Day(), "-", invite.CreatedAt.Month())
+				if _, err := fInvites.WriteString(fmt.Sprint(*org.Login, ",", *invite.Login, ",", inviteDate, ",", *invite.Inviter.Login, "\n")); err != nil {
 					fmt.Printf("Failed to write invite for %s\n", *invite.Login)
 				}
 			}
