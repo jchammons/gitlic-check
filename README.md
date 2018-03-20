@@ -38,5 +38,5 @@ If this folder is in a Team Drive, then you must add the service account as a me
 ### tokens.txt Sample
 >Note: You do not need to specify false if it is not a Team Drive
 ```
-github-PAT,drive-folder-ID,false
+github-PAT,drive-folder-ID,true
 ```
