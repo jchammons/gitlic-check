@@ -1,4 +1,6 @@
 output/
 auth.txt
+config.json
+tokens.txt
 ignore.txt
 .DS_Store

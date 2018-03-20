@@ -6,17 +6,19 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/google/go-github/github"
 	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
+	"google.golang.org/api/drive/v3"
 )
 
-// Follow instructions in README for proper authentication
 func getTokens() []string {
-	fh, err := ioutil.ReadFile("auth.txt")
+	fh, err := ioutil.ReadFile("tokens.txt")
 	if err != nil {
-		fmt.Printf("Failed to read PAT from auth.txt: %s", err)
+		fmt.Printf("Failed to read PAT from auth.txt: %s\n", err)
 	}
 	tokens := strings.Split(string(fh), ",")
 	return tokens
@@ -41,17 +43,44 @@ func prepareOutput() (*os.File, *os.File, *os.File) {
 	os.Chdir("output")
 	fRepos, err := os.OpenFile("repos.csv", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		fmt.Printf("Couldn't create repos.csv. Failed with %s", err)
+		fmt.Printf("Couldn't create repos.csv. Failed with %s\n", err)
 	}
 	fUsers, err := os.OpenFile("users.csv", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		fmt.Printf("Couldn't create users.csv. Failed with %s", err)
+		fmt.Printf("Couldn't create users.csv. Failed with %s\n", err)
 	}
 	fInvites, err := os.OpenFile("invites.csv", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		fmt.Printf("Couldn't create invites.csv. Failed with %s", err)
+		fmt.Printf("Couldn't create invites.csv. Failed with %s\n", err)
 	}
 	return fRepos, fUsers, fInvites
+}
+
+func uploadFiles(d *drive.Service, auth string, teamDrive bool, files ...*os.File) {
+	var parents []string
+	parents = append(parents, auth)
+	for _, file := range files {
+		f := &drive.File{
+			MimeType: "text/csv",
+			Name:     file.Name(),
+			Parents:  parents,
+		}
+		if teamDrive {
+			_, err := d.Files.Create(f).SupportsTeamDrives(true).Do()
+			if err != nil {
+				fmt.Printf("Failed to upload %s: %s\n", file.Name(), err)
+			} else {
+				fmt.Printf("Successfully uploaded %s", file.Name())
+			}
+		} else {
+			_, err := d.Files.Create(f).Do()
+			if err != nil {
+				fmt.Printf("Failed to upload %s: %s\n", file.Name(), err)
+			} else {
+				fmt.Printf("Successfully uploaded %s", file.Name())
+			}
+		}
+	}
 }
 
 func main() {
@@ -59,13 +88,7 @@ func main() {
 	ignoredOrgs := getIgnoredOrgs()
 	auth := getTokens()
 
-	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{
-			AccessToken: auth[0],
-		},
-	)
-	authClient := oauth2.NewClient(ctx, ts)
-	client := github.NewClient(authClient)
+	ghClient := github.NewClient(oauth2.NewClient(ctx, oauth2.StaticTokenSource(&oauth2.Token{AccessToken: auth[0]})))
 	lo := &github.ListOptions{PerPage: 100}
 
 	fmt.Print("Working...\n\n")
@@ -87,7 +110,7 @@ func main() {
 	var orgs []*github.Organization
 
 	for {
-		partialOrgs, resp, err := client.Organizations.List(ctx, "", lo)
+		partialOrgs, resp, err := ghClient.Organizations.List(ctx, "", lo)
 		if err != nil {
 			fmt.Printf("Organizations.List failed with %s\n", err)
 			return
@@ -116,7 +139,7 @@ func main() {
 		var invites []*github.Invitation
 
 		for {
-			partialInvites, resp, err := client.Organizations.ListPendingOrgInvitations(ctx, *org.Login, lo)
+			partialInvites, resp, err := ghClient.Organizations.ListPendingOrgInvitations(ctx, *org.Login, lo)
 			if err != nil {
 				fmt.Printf("Repositories.List failed with %s\n", err)
 				return
@@ -143,7 +166,7 @@ func main() {
 		}
 
 		for {
-			partialRepos, resp, err := client.Repositories.ListByOrg(ctx, *org.Login, opt)
+			partialRepos, resp, err := ghClient.Repositories.ListByOrg(ctx, *org.Login, opt)
 			if err != nil {
 				fmt.Printf("Repositories.List failed with %s\n", err)
 				return
@@ -163,7 +186,7 @@ func main() {
 				fmt.Printf("Failed to write to repos.csv on %s with %s\n", *org.Login, err)
 			}
 
-			lics, _, err := client.Repositories.License(ctx, *repo.Owner.Login, *repo.Name)
+			lics, _, err := ghClient.Repositories.License(ctx, *repo.Owner.Login, *repo.Name)
 			if err != nil {
 				fRepos.WriteString("None\n")
 				continue
@@ -186,7 +209,7 @@ func main() {
 		}
 
 		for {
-			partialMembers, resp, err := client.Organizations.ListMembers(ctx, *org.Login, memOpt)
+			partialMembers, resp, err := ghClient.Organizations.ListMembers(ctx, *org.Login, memOpt)
 			if err != nil {
 				fmt.Printf("Organizations.ListMembers, no filter, failed with %s\n", err)
 				break
@@ -202,7 +225,7 @@ func main() {
 		}
 
 		for {
-			partialNo2f, resp, err := client.Organizations.ListMembers(ctx, *org.Login, no2fOpt)
+			partialNo2f, resp, err := ghClient.Organizations.ListMembers(ctx, *org.Login, no2fOpt)
 			if err != nil {
 				fmt.Printf("Organizations.ListMembers, 2FA filter, failed with %s\n", err)
 				break
@@ -242,12 +265,40 @@ func main() {
 		fmt.Printf("Completed %d of %d\n", i+1, len(orgs))
 	}
 
+	fmt.Print("CSVs are ready!\n")
+
+	if len(auth) > 1 {
+		fmt.Print("\nNow uploading...\n")
+		teamDrive := false
+		if len(auth) > 2 {
+			input, err := strconv.ParseBool(auth[2])
+			if err != nil {
+				fmt.Print("Could not parse boolean value for Team Drive from third argument in tokens.txt. Please ensure you are using a boolean value.")
+			}
+			teamDrive = input
+		}
+		secret, err := ioutil.ReadFile("../config.json")
+		if err != nil {
+			fmt.Printf("Failed to read JSON config file: %v\n", err)
+		}
+		config, err := google.JWTConfigFromJSON(secret, drive.DriveFileScope)
+		if err != nil {
+			log.Fatalf("Unable to parse client secret file to config: %v\n", err)
+		}
+		drClient, err := drive.New(config.Client(ctx))
+		if err != nil {
+			fmt.Printf("Failed to connect to Drive: %v\n", err)
+		}
+		uploadFiles(drClient, auth[1], teamDrive, fRepos, fUsers, fInvites)
+	}
+
 	if err := fRepos.Close(); err != nil {
 		log.Fatal(err)
 	}
 	if err := fUsers.Close(); err != nil {
 		log.Fatal(err)
 	}
-
-	fmt.Print("CSVs are now ready\n")
+	if err := fInvites.Close(); err != nil {
+		log.Fatal(err)
+	}
 }
