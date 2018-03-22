@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -18,7 +19,7 @@ import (
 func getTokens() []string {
 	fh, err := ioutil.ReadFile("tokens.txt")
 	if err != nil {
-		fmt.Printf("Failed to read PAT from auth.txt: %s\n", err)
+		log.Printf("Failed to read PAT from auth.txt: %s\n", err)
 	}
 	tokens := strings.Split(string(fh), ",")
 	return tokens
@@ -43,15 +44,15 @@ func prepareOutput() (*os.File, *os.File, *os.File) {
 	os.Chdir("output")
 	fRepos, err := os.OpenFile("repos.csv", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		fmt.Printf("Couldn't create repos.csv. Failed with %s\n", err)
+		log.Printf("Couldn't create repos.csv. Failed with %s\n", err)
 	}
 	fUsers, err := os.OpenFile("users.csv", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		fmt.Printf("Couldn't create users.csv. Failed with %s\n", err)
+		log.Printf("Couldn't create users.csv. Failed with %s\n", err)
 	}
 	fInvites, err := os.OpenFile("invites.csv", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		fmt.Printf("Couldn't create invites.csv. Failed with %s\n", err)
+		log.Printf("Couldn't create invites.csv. Failed with %s\n", err)
 	}
 	return fRepos, fUsers, fInvites
 }
@@ -68,16 +69,16 @@ func uploadFiles(d *drive.Service, auth string, teamDrive bool, files ...*os.Fil
 		if teamDrive {
 			_, err := d.Files.Create(f).SupportsTeamDrives(true).Do()
 			if err != nil {
-				fmt.Printf("Failed to upload %s: %s\n", file.Name(), err)
+				log.Printf("Failed to upload %s: %s\n", file.Name(), err)
 			} else {
-				fmt.Printf("Successfully uploaded %s", file.Name())
+				log.Printf("Successfully uploaded %s", file.Name())
 			}
 		} else {
 			_, err := d.Files.Create(f).Do()
 			if err != nil {
-				fmt.Printf("Failed to upload %s: %s\n", file.Name(), err)
+				log.Printf("Failed to upload %s: %s\n", file.Name(), err)
 			} else {
-				fmt.Printf("Successfully uploaded %s", file.Name())
+				log.Printf("Successfully uploaded %s", file.Name())
 			}
 		}
 	}
@@ -91,20 +92,36 @@ func main() {
 	ghClient := github.NewClient(oauth2.NewClient(ctx, oauth2.StaticTokenSource(&oauth2.Token{AccessToken: auth[0]})))
 	lo := &github.ListOptions{PerPage: 100}
 
-	fmt.Print("Working...\n\n")
+	log.Print("Working...\n\n")
+
+	pwd, err := os.Getwd()
+	if err != nil {
+		log.Fatalf("Error: %v", err)
+	}
 
 	fRepos, fUsers, fInvites := prepareOutput()
+	defer func() {
+		if err := fRepos.Close(); err != nil {
+			log.Fatal(err)
+		}
+		if err := fUsers.Close(); err != nil {
+			log.Fatal(err)
+		}
+		if err := fInvites.Close(); err != nil {
+			log.Fatal(err)
+		}
+	}()
 
 	if _, err := fRepos.WriteString("Org,Repo,Private,Fork,License\n"); err != nil {
-		fmt.Printf("Initial save to repos CSV failed with %s\n", err)
+		log.Printf("Initial save to repos CSV failed with %s\n", err)
 	}
 
 	if _, err := fUsers.WriteString("Org,User,Two-Factor Enabled\n"); err != nil {
-		fmt.Printf("Initial save to users CSV failed with %s\n", err)
+		log.Printf("Initial save to users CSV failed with %s\n", err)
 	}
 
 	if _, err := fInvites.WriteString("Org,User,Date Sent,Invited By\n"); err != nil {
-		fmt.Printf("Initial save to invites CSV failed with %s\n", err)
+		log.Printf("Initial save to invites CSV failed with %s\n", err)
 	}
 
 	var orgs []*github.Organization
@@ -112,7 +129,7 @@ func main() {
 	for {
 		partialOrgs, resp, err := ghClient.Organizations.List(ctx, "", lo)
 		if err != nil {
-			fmt.Printf("Organizations.List failed with %s\n", err)
+			log.Printf("Organizations.List failed with %s\n", err)
 			return
 		}
 
@@ -127,7 +144,7 @@ func main() {
 
 	for i, org := range orgs {
 		if ignoredOrgs != nil && ignoredOrgs[*org.Login] {
-			fmt.Printf("Ignored %s, %d of %d\n", *org.Login, i+1, len(orgs))
+			log.Printf("Ignored %s, %d of %d\n", *org.Login, i+1, len(orgs))
 			continue
 		}
 
@@ -141,7 +158,7 @@ func main() {
 		for {
 			partialInvites, resp, err := ghClient.Organizations.ListPendingOrgInvitations(ctx, *org.Login, lo)
 			if err != nil {
-				fmt.Printf("Repositories.List failed with %s\n", err)
+				log.Printf("Repositories.List failed with %s\n", err)
 				return
 			}
 
@@ -160,7 +177,7 @@ func main() {
 				// Cancel Membership endpoint with user id
 				inviteDate := fmt.Sprint(invite.CreatedAt.Year(), "-", invite.CreatedAt.Day(), "-", invite.CreatedAt.Month())
 				if _, err := fInvites.WriteString(fmt.Sprint(*org.Login, ",", *invite.Login, ",", inviteDate, ",", *invite.Inviter.Login, "\n")); err != nil {
-					fmt.Printf("Failed to write invite for %s\n", *invite.Login)
+					log.Printf("Failed to write invite for %s\n", *invite.Login)
 				}
 			}
 		}
@@ -168,7 +185,7 @@ func main() {
 		for {
 			partialRepos, resp, err := ghClient.Repositories.ListByOrg(ctx, *org.Login, opt)
 			if err != nil {
-				fmt.Printf("Repositories.List failed with %s\n", err)
+				log.Printf("Repositories.List failed with %s\n", err)
 				return
 			}
 
@@ -183,7 +200,7 @@ func main() {
 
 		for _, repo := range repos {
 			if _, err := fRepos.WriteString(fmt.Sprint(*org.Login, ",", *repo.Name, ",", *repo.Private, ",", *repo.Fork, ",")); err != nil {
-				fmt.Printf("Failed to write to repos.csv on %s with %s\n", *org.Login, err)
+				log.Printf("Failed to write to repos.csv on %s with %s\n", *org.Login, err)
 			}
 
 			lics, _, err := ghClient.Repositories.License(ctx, *repo.Owner.Login, *repo.Name)
@@ -193,7 +210,7 @@ func main() {
 			}
 
 			if _, err = fRepos.WriteString(fmt.Sprint(*lics.License.Name, "\n")); err != nil {
-				fmt.Printf("Failed to write to repos.csv on %s with %s\n", *org.Login, err)
+				log.Printf("Failed to write to repos.csv on %s with %s\n", *org.Login, err)
 			}
 		}
 
@@ -211,7 +228,7 @@ func main() {
 		for {
 			partialMembers, resp, err := ghClient.Organizations.ListMembers(ctx, *org.Login, memOpt)
 			if err != nil {
-				fmt.Printf("Organizations.ListMembers, no filter, failed with %s\n", err)
+				log.Printf("Organizations.ListMembers, no filter, failed with %s\n", err)
 				break
 			}
 
@@ -227,7 +244,7 @@ func main() {
 		for {
 			partialNo2f, resp, err := ghClient.Organizations.ListMembers(ctx, *org.Login, no2fOpt)
 			if err != nil {
-				fmt.Printf("Organizations.ListMembers, 2FA filter, failed with %s\n", err)
+				log.Printf("Organizations.ListMembers, 2FA filter, failed with %s\n", err)
 				break
 			}
 
@@ -247,39 +264,40 @@ func main() {
 
 		for _, member := range members {
 			if _, err := fUsers.WriteString(fmt.Sprint(*org.Login, ",", *member.Login, ",")); err != nil {
-				fmt.Printf("Failed to write to users.csv on %s with %s\n", *org.Login, err)
+				log.Printf("Failed to write to users.csv on %s with %s\n", *org.Login, err)
 			}
 
 			if membersFilter[*member.Login] {
 				if _, err := fUsers.WriteString("False\n"); err != nil {
-					fmt.Printf("Failed to write to users.csv on %s with %s\n", *org.Login, err)
+					log.Printf("Failed to write to users.csv on %s with %s\n", *org.Login, err)
 				}
 				continue
 			}
 
 			if _, err := fUsers.WriteString("True\n"); err != nil {
-				fmt.Printf("Failed to write to users.csv on %s with %s\n", *org.Login, err)
+				log.Printf("Failed to write to users.csv on %s with %s\n", *org.Login, err)
 			}
 		}
 
-		fmt.Printf("Completed %d of %d\n", i+1, len(orgs))
+		log.Printf("Completed %d of %d\n", i+1, len(orgs))
 	}
 
-	fmt.Print("CSVs are ready!\n")
+	log.Print("CSVs are ready!\n")
 
 	if len(auth) > 1 {
-		fmt.Print("\nNow uploading...\n")
+		log.Print("\nNow uploading...\n")
 		teamDrive := false
 		if len(auth) > 2 {
-			input, err := strconv.ParseBool(auth[2])
+			input, err := strconv.ParseBool(strings.TrimSpace(auth[2]))
 			if err != nil {
-				fmt.Print("Could not parse boolean value for Team Drive from third argument in tokens.txt. Please ensure you are using a boolean value.")
+				log.Fatalf("Could not parse boolean value for Team Drive from third argument in tokens.txt. Please ensure you are using a boolean value. Error: %v\n", err)
 			}
 			teamDrive = input
 		}
-		secret, err := ioutil.ReadFile("../config.json")
+
+		secret, err := ioutil.ReadFile(filepath.Join(pwd, "config.json"))
 		if err != nil {
-			fmt.Printf("Failed to read JSON config file: %v\n", err)
+			log.Fatalf("Failed to read JSON config file: %v\n", err)
 		}
 		config, err := google.JWTConfigFromJSON(secret, drive.DriveFileScope)
 		if err != nil {
@@ -287,18 +305,8 @@ func main() {
 		}
 		drClient, err := drive.New(config.Client(ctx))
 		if err != nil {
-			fmt.Printf("Failed to connect to Drive: %v\n", err)
+			log.Fatalf("Failed to connect to Drive: %v\n", err)
 		}
 		uploadFiles(drClient, auth[1], teamDrive, fRepos, fUsers, fInvites)
-	}
-
-	if err := fRepos.Close(); err != nil {
-		log.Fatal(err)
-	}
-	if err := fUsers.Close(); err != nil {
-		log.Fatal(err)
-	}
-	if err := fInvites.Close(); err != nil {
-		log.Fatal(err)
 	}
 }
