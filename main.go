@@ -58,7 +58,7 @@ func prepareOutput() (*os.File, *os.File, *os.File) {
 	return fRepos, fUsers, fInvites
 }
 
-func uploadFiles(d *drive.Service, auth string, teamDrive bool, files ...*os.File) {
+func uploadFiles(d *drive.Service, auth string, enableTeamDrive bool, files ...*os.File) {
 	var parents []string
 	parents = append(parents, auth)
 	for _, file := range files {
@@ -67,20 +67,11 @@ func uploadFiles(d *drive.Service, auth string, teamDrive bool, files ...*os.Fil
 			Name:     file.Name(),
 			Parents:  parents,
 		}
-		if teamDrive {
-			_, err := d.Files.Create(f).Media(file).SupportsTeamDrives(true).Do()
-			if err != nil {
-				log.Printf("Failed to upload %s: %s\n", file.Name(), err)
-			} else {
-				log.Printf("Successfully uploaded %s", file.Name())
-			}
+		_, err := d.Files.Create(f).Media(file).SupportsTeamDrives(enableTeamDrive).Do()
+		if err != nil {
+			log.Printf("Failed to upload %s: %s\n", file.Name(), err)
 		} else {
-			_, err := d.Files.Create(f).Media(file).Do()
-			if err != nil {
-				log.Printf("Failed to upload %s: %s\n", file.Name(), err)
-			} else {
-				log.Printf("Successfully uploaded %s\n", file.Name())
-			}
+			log.Printf("Successfully uploaded %s", file.Name())
 		}
 	}
 }
@@ -98,7 +89,7 @@ func main() {
 
 	pwd, err := os.Getwd()
 	if err != nil {
-		log.Fatalf("Error: %v", err)
+		log.Fatalf("Error getting working directory: %v", err)
 	}
 
 	fRepos, fUsers, fInvites := prepareOutput()
@@ -297,13 +288,14 @@ func main() {
 
 	if len(auth) > 1 {
 		log.Print("Uploading to Google Drive...\n")
-		teamDrive := false
+		enableTeamDrive := false
 		if len(auth) > 2 {
 			input, err := strconv.ParseBool(strings.TrimSpace(auth[2]))
 			if err != nil {
-				log.Fatalf("Could not parse boolean value for Team Drive from third argument in tokens.txt. Please ensure you are using a boolean value. Error: %v\n", err)
+				log.Printf("Failed to parse boolean value for Team Drive from third argument in tokens.txt (default - false). Error: %v\n", err)
+			} else {
+				enableTeamDrive = input
 			}
-			teamDrive = input
 		}
 
 		secret, err := ioutil.ReadFile(filepath.Join(pwd, "config.json"))
@@ -318,6 +310,6 @@ func main() {
 		if err != nil {
 			log.Fatalf("Failed to connect to Drive: %v\n", err)
 		}
-		uploadFiles(drClient, auth[1], teamDrive, fRepos, fUsers, fInvites)
+		uploadFiles(drClient, auth[1], enableTeamDrive, fRepos, fUsers, fInvites)
 	}
 }
