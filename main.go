@@ -6,8 +6,10 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/go-github/github"
 	"golang.org/x/oauth2"
@@ -18,7 +20,7 @@ import (
 func getTokens() []string {
 	fh, err := ioutil.ReadFile("tokens.txt")
 	if err != nil {
-		log.Printf("Failed to read data from tokens.txt: %v\n", err)
+		log.Fatalf("Failed to read data from tokens.txt: %v\n", err)
 	}
 	tokens := strings.Split(string(fh), ",")
 	return tokens
@@ -41,15 +43,15 @@ func prepareOutput() (*os.File, *os.File, *os.File) {
 	os.RemoveAll("output")
 	os.Mkdir("output", 0777)
 	os.Chdir("output")
-	fRepos, err := os.OpenFile("repos.csv", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	fRepos, err := os.OpenFile("repos.csv", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
 		log.Printf("Failed to create repos.csv with %s\n", err)
 	}
-	fUsers, err := os.OpenFile("users.csv", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	fUsers, err := os.OpenFile("users.csv", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
 		log.Printf("Failed to create users.csv with %s\n", err)
 	}
-	fInvites, err := os.OpenFile("invites.csv", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	fInvites, err := os.OpenFile("invites.csv", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
 		log.Printf("Failed to create invites.csv with %s\n", err)
 	}
@@ -66,14 +68,14 @@ func uploadFiles(d *drive.Service, auth string, teamDrive bool, files ...*os.Fil
 			Parents:  parents,
 		}
 		if teamDrive {
-			_, err := d.Files.Create(f).SupportsTeamDrives(true).Do()
+			_, err := d.Files.Create(f).Media(file).SupportsTeamDrives(true).Do()
 			if err != nil {
 				log.Printf("Failed to upload %s: %s\n", file.Name(), err)
 			} else {
 				log.Printf("Successfully uploaded %s", file.Name())
 			}
 		} else {
-			_, err := d.Files.Create(f).Do()
+			_, err := d.Files.Create(f).Media(file).Do()
 			if err != nil {
 				log.Printf("Failed to upload %s: %s\n", file.Name(), err)
 			} else {
@@ -90,10 +92,27 @@ func main() {
 
 	ghClient := github.NewClient(oauth2.NewClient(ctx, oauth2.StaticTokenSource(&oauth2.Token{AccessToken: auth[0]})))
 	lo := &github.ListOptions{PerPage: 100}
+	twoWeeks := time.Duration(336) * time.Hour
 
-	fmt.Print("Working...\n\n")
+	log.Print("Working...\n\n")
+
+	pwd, err := os.Getwd()
+	if err != nil {
+		log.Fatalf("Error: %v", err)
+	}
 
 	fRepos, fUsers, fInvites := prepareOutput()
+	defer func() {
+		if err := fRepos.Close(); err != nil {
+			log.Fatal(err)
+		}
+		if err := fUsers.Close(); err != nil {
+			log.Fatal(err)
+		}
+		if err := fInvites.Close(); err != nil {
+			log.Fatal(err)
+		}
+	}()
 
 	if _, err := fRepos.WriteString("Org,Repo,Private,Fork,License\n"); err != nil {
 		log.Printf("Initial save to repos CSV failed with %s\n", err)
@@ -103,7 +122,7 @@ func main() {
 		log.Printf("Initial save to users CSV failed with %s\n", err)
 	}
 
-	if _, err := fInvites.WriteString("Org,User,Date Sent,Invited By\n"); err != nil {
+	if _, err := fInvites.WriteString("Org,User,Date Sent,Invited By,Deleted\n"); err != nil {
 		log.Printf("Initial save to invites CSV failed with %s\n", err)
 	}
 
@@ -127,7 +146,7 @@ func main() {
 
 	for i, org := range orgs {
 		if ignoredOrgs != nil && ignoredOrgs[*org.Login] {
-			fmt.Printf("\nIgnored %s, %d of %d\n", *org.Login, i+1, len(orgs))
+			log.Printf("Ignored %s, %d of %d\n", *org.Login, i+1, len(orgs))
 			continue
 		}
 
@@ -151,12 +170,21 @@ func main() {
 
 		if len(invites) > 0 {
 			for _, invite := range invites {
-				// TODO Check invite date; if older than 2 weeks, call Organization
-				// Cancel Membership endpoint with user id
-				inviteDate := fmt.Sprint(invite.CreatedAt.Year(), "-", invite.CreatedAt.Day(), "-", invite.CreatedAt.Month())
-				if _, err := fInvites.WriteString(fmt.Sprint(*org.Login, ",", *invite.Login, ",", inviteDate, ",", *invite.Inviter.Login, "\n")); err != nil {
-					log.Printf("Failed to write invite for %s\n", *invite.Login)
+				inviteDate := fmt.Sprint(int(invite.CreatedAt.Month()), "/", fmt.Sprintf("%02d", invite.CreatedAt.Day()), "/", invite.CreatedAt.Year())
+				tSinceInvite := time.Now().UTC().Sub(invite.CreatedAt.UTC())
+				if _, err := fInvites.WriteString(fmt.Sprint(*org.Login, ",", *invite.Login, ",", inviteDate, ",", *invite.Inviter.Login)); err != nil {
+					log.Printf("Failed to write invite data for %s from %s to invite.csv\n", *invite.Login, *org.Login)
 				}
+				if tSinceInvite > twoWeeks {
+					_, err := ghClient.Organizations.RemoveOrgMembership(ctx, *invite.Login, *org.Login)
+					if err != nil {
+						log.Printf("Failed to remove flagged pending invitation for %s from org %s\n", *invite.Login, *org.Login)
+					} else {
+						fInvites.WriteString(",True\n")
+					}
+					continue
+				}
+				fInvites.WriteString(",\n")
 			}
 		}
 
@@ -262,22 +290,23 @@ func main() {
 			}
 		}
 
-		fmt.Printf("\nCompleted %s, %d of %d\n", *org.Login, i+1, len(orgs))
+		log.Printf("Completed %s, %d of %d\n", *org.Login, i+1, len(orgs))
 	}
 
-	fmt.Print("\nCSVs are ready!\n")
+	log.Print("\nCSVs are ready!\n")
 
 	if len(auth) > 1 {
-		fmt.Print("Uploading to Google Drive...\n")
+		log.Print("Uploading to Google Drive...\n")
 		teamDrive := false
 		if len(auth) > 2 {
-			input, err := strconv.ParseBool(auth[2])
+			input, err := strconv.ParseBool(strings.TrimSpace(auth[2]))
 			if err != nil {
-				fmt.Print("Could not parse boolean value for Team Drive from third argument in tokens.txt. Please ensure you are using a boolean value.\n")
+				log.Fatalf("Could not parse boolean value for Team Drive from third argument in tokens.txt. Please ensure you are using a boolean value. Error: %v\n", err)
 			}
 			teamDrive = input
 		}
-		secret, err := ioutil.ReadFile("../config.json")
+
+		secret, err := ioutil.ReadFile(filepath.Join(pwd, "config.json"))
 		if err != nil {
 			log.Fatalf("Failed to read JSON config file: %v\n", err)
 		}
@@ -290,15 +319,5 @@ func main() {
 			log.Fatalf("Failed to connect to Drive: %v\n", err)
 		}
 		uploadFiles(drClient, auth[1], teamDrive, fRepos, fUsers, fInvites)
-	}
-
-	if err := fRepos.Close(); err != nil {
-		log.Print(err)
-	}
-	if err := fUsers.Close(); err != nil {
-		log.Print(err)
-	}
-	if err := fInvites.Close(); err != nil {
-		log.Print(err)
 	}
 }
