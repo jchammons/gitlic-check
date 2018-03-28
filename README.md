@@ -1,5 +1,5 @@
 # gitlic-check
-A utility to verify and manage OSS licenses, contribution guidelines, Github organization and repository settings.
+A utility to verify and manage OSS licenses, contribution guidelines, Github organization and repository settings for both public and private repositories.
 
 ## Functionality 
 *Audit* 
