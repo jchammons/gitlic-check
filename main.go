@@ -65,7 +65,7 @@ func prepareOutput(uploadOnly *bool, filesToOutput []string) map[string]*os.File
 }
 
 func main() {
-	fUploadOnly := flag.Bool("upload", false, "test upload only; skip GitHub check")
+	fUploadOnly := flag.Bool("upload-only", false, "test upload only; skip GitHub check")
 	fNoUpload := flag.Bool("no-upload", false, "test/re-run GitHub check only; skip upload")
 	flag.Parse()
 
