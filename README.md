@@ -1,5 +1,20 @@
 # gitlic-check
-A small program to generate CSV reports on the GitHub repositories for organizations of which you are a member. What it currently pulls:
+A utility to verify and manage OSS licenses, contribution guidelines, Github organization and repository settings.
+
+## Functionality 
+*Audit* 
+- Verify Github Organization and Repository settings (specified either globally or per org/repo).
+...Including two-factor authentication, presence and type of LICENSE and CONTRIBUTING files.
+- Catalog unaccepted invitations to repositories.
+
+*Enforce*
+- Apply Github Organization and Repository settings (specified either globally or per org/repo).
+- Cancel unaccepted invitations of a certain age (e.g. 14 days old) to repositories.
+- Catalog unaccepted invitations to repositories.
+
+*Report*
+- Generate CSV reports on the GitHub repositories for organizations of which you are a member.
+- Upload reports to Google Sheets.
 
 ## Usage
 To connect with the GitHub API, generate a personal access token [in your settings](https://github.com/settings/applications#personal-access-tokens). If you want to include private repositories in your reports, be sure to select the entire repo scope in the token settings. Then, put your PAT in a file named `tokens.txt`, which will be read into the tool.
