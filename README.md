@@ -4,13 +4,14 @@ A utility to verify and manage OSS licenses, contribution guidelines, Github org
 ## Functionality 
 *Audit* 
 - Verify Github Organization and Repository settings (specified either globally or per org/repo).
-...Including two-factor authentication, presence and type of LICENSE and CONTRIBUTING files.
+  * Including two-factor authentication, presence and type of LICENSE and CONTRIBUTING files.
+  * and other org/repo specific settings.
 - Catalog unaccepted invitations to repositories.
 
 *Enforce*
 - Apply Github Organization and Repository settings (specified either globally or per org/repo).
+  * Including requiring two-factor authentication and other org/repo specific settings.
 - Cancel unaccepted invitations of a certain age (e.g. 14 days old) to repositories.
-- Catalog unaccepted invitations to repositories.
 
 *Report*
 - Generate CSV reports on the GitHub repositories for organizations of which you are a member.
