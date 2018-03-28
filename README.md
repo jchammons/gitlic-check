@@ -1,8 +1,24 @@
-# gitlic-check
-A small program to generate CSV reports about all of the organizations you own and the repositories and users under those organizations.
+# GitLic
+A utility to verify and manage OSS licenses, contribution guidelines, and GitHub organization and repository settings for both public and private repositories.
+
+## Functionality 
+*Audit* 
+- Verify GitHub Organization and Repository settings (specified either globally or per org/repo).
+  * Including two-factor authentication, presence, and type of LICENSE and CONTRIBUTING files.
+  * and other org/repo specific settings.
+- Catalog unaccepted invitations to repositories.
+
+*Enforce*
+- Apply GitHub Organization and Repository settings (specified either globally or per org/repo).
+  * Including requiring two-factor authentication and other org/repo specific settings.
+- Cancel unaccepted invitations of a certain age (e.g. 14 days old) to organizations.
+
+*Report*
+- Generate CSV reports on the GitHub repositories for organizations of which you are a member.
+- Upload reports to Google Sheets.
 
 ## Configuration
-The program requires a `config.json` file to run. The options for this config file are:
+GitLic requires a `config.json` file to run. The options for this config file are:
 
 ```
 github:
