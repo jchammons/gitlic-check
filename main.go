@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
@@ -90,6 +91,12 @@ func main() {
 
 	if *fUploadOnly == false {
 		RunCheck(ctx, cf, fo)
+		for _, file := range fo {
+			if _, err = file.Seek(0, io.SeekStart); err != nil {
+				log.Fatal(err)
+			}
+		}
+
 	}
 
 	if *fNoUpload == false && cf.Drive != nil {
