@@ -45,7 +45,6 @@ func getConfig() config {
 
 func prepareOutput(uploadOnly *bool, filesToOutput []string) map[string]*os.File {
 	if *uploadOnly == false {
-		fmt.Println("Not upload test")
 		os.RemoveAll("output")
 		os.Mkdir("output", 0777)
 	}
