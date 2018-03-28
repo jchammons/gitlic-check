@@ -1,6 +1,3 @@
 output/
-auth.txt
-config.json
-tokens.txt
-ignore.txt
+config*.json
 .DS_Store
