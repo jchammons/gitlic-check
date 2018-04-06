@@ -1,0 +1,13 @@
+version: 2
+jobs:
+  build:
+    general:
+      branches:
+        only:
+          - feature/k8s
+    machine:
+      services:
+        - docker
+    steps:
+      - checkout
+      - run: docker build --no-cache -t quay.io/solarwinds/gitlic-check .
