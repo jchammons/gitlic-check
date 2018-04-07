@@ -28,7 +28,7 @@ type config struct {
 }
 
 func getConfig() config {
-	fh, err := ioutil.ReadFile("config.json")
+	fh, err := ioutil.ReadFile("config/config.json")
 	if err != nil {
 		log.Fatalf("Failed to read config file. Error: %s\n", err)
 	}
