@@ -11,3 +11,8 @@ jobs:
     steps:
       - checkout
       - run: docker build --no-cache -t quay.io/solarwinds/gitlic-check .
+      - run: [[ -z "${CIRCLE_TAG}" ]] && tag="$(echo $CIRCLE_SHA1 | cut -c -7)" || tag="${CIRCLE_TAG}"
+      - run: docker tag quay.io/solarwinds/gitlic-check quay.io/solarwinds/gitlic-check:$tag
+      - run: docker login -u $DOCKER_USER -p $DOCKER_PASS quay.io
+      - run: docker push quay.io/solarwinds/gitlic-check
+      - run: docker push quay.io/solarwinds/gitlic-check:$tag
