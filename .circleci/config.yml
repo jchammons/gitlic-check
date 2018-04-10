@@ -5,6 +5,8 @@ jobs:
       branches:
         only:
           - feature/k8s
+          - staging
+          - master
     machine:
       services:
         - docker
