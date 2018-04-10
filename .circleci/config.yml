@@ -4,7 +4,6 @@ jobs:
     general:
       branches:
         only:
-          - feature/k8s
           - staging
           - master
     machine:
