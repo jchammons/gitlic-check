@@ -15,7 +15,7 @@ import (
 func UploadToDrive(ctx context.Context, cf config, wd string, fo map[string]*os.File) {
 	log.Print("Uploading to Google Drive...\n")
 
-	secret, err := ioutil.ReadFile(filepath.Join(wd, "config-drive.json"))
+	secret, err := ioutil.ReadFile(filepath.Join(wd, "config/config-drive.json"))
 	if err != nil {
 		log.Fatalf("Failed to read JSON config file. Error: %v\n", err)
 	}
