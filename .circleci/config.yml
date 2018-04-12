@@ -1,0 +1,14 @@
+version: 2
+jobs:
+  build:
+    general:
+      branches:
+        only:
+          - staging
+          - master
+    machine:
+      services:
+        - docker
+    steps:
+      - checkout
+      - run: chmod +x build.sh && ./build.sh
