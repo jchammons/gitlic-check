@@ -1,4 +1,4 @@
-package main
+package gitlic
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 )
 
 // UploadToDrive initiates the process of uploading your files to the specified Drive directory.
-func UploadToDrive(ctx context.Context, cf config, wd string, fo map[string]*os.File) {
+func UploadToDrive(ctx context.Context, cf Config, wd string, fo map[string]*os.File) {
 	log.Print("Uploading to Google Drive...\n")
 
 	secret, err := ioutil.ReadFile(filepath.Join(wd, "config/config-drive.json"))

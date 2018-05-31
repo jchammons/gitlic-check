@@ -1,4 +1,4 @@
-package main
+package gitlic
 
 import (
 	"context"
@@ -11,6 +11,22 @@ import (
 	"golang.org/x/oauth2"
 )
 
+type GhConfig struct {
+	Token          string   `json:"pat"`
+	IgnoredOrgs    []string `json:"ignoredOrgs,omitempty"`
+	RmInvitesAfter int      `json:"rmInvitesAfter,omitempty"` // in hours
+}
+
+type DriveConfig struct {
+	OutputDir       string `json:"outputDir"`
+	EnableTeamDrive bool   `json:"enableTeamDrive,omitempty"`
+}
+
+type Config struct {
+	Github *GhConfig    `json:"github,omitempty"`
+	Drive  *DriveConfig `json:"drive,omitempty"`
+}
+
 // getIgnoredMap will turn the array of ignored orgs from the config file into a map that is easy to check against as we iterate over organizations returned from the GitHub API
 func getIgnoredMap(a []string) map[string]bool {
 	ignoredOrgs := make(map[string]bool)
@@ -21,7 +37,7 @@ func getIgnoredMap(a []string) map[string]bool {
 }
 
 // RunCheck begins the process of querying the GitHub API. It will loop through your organizations and their repositories and pull info on configuration, license, and users, including invitations. It will output the results to respective CSV files in the output folder. See the README for an idea of what these CSV reports contain.
-func RunCheck(ctx context.Context, cf config, fo map[string]*os.File) {
+func RunCheck(ctx context.Context, cf Config, fo map[string]*os.File) {
 	ghClient := github.NewClient(oauth2.NewClient(ctx, oauth2.StaticTokenSource(&oauth2.Token{AccessToken: cf.Github.Token})))
 	lo := &github.ListOptions{PerPage: 100}
 	maxInviteT := time.Duration(cf.Github.RmInvitesAfter) * time.Hour
