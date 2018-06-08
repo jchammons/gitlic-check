@@ -88,3 +88,18 @@ _invites.csv_
 Org,User,Date Sent,Invited By,Deleted
 org-name,user-name,2018-03-15,user-name,true
 ```
+
+## Augit
+Augit provides functionality to ensure that no GitHub account has access to SolarWinds repos unless they are an approved
+and active employee or an approved bot account. This is accomplished by checking the list of active GitHub users in SolarWinds
+organizations against a database of SolarWinds employees retrieved from Azure Active Directory. The Azure AD integration
+is facilitated by the [swio-users](https://github.com/solarwinds/swio-users) repo, also used by Kudos and other
+SolarWinds.io-related projects.
+
+### Populating the Database
+The `populate` subcommand will use your database.yml and env vars for ENVIRONMENT, DATABASE_URL (if production environment),
+AD_CLIENT_ID, and AD_SECRET to populate your database with all enabled users from Active Directory. In the future it will also remove folks who are no longer enabled or in AD.
+
+### Prerequisites for Completion
+Augit relies on the personal access token of a user having *owner* level access to each SolarWinds repo. This is
+required because the GitHub API will not return concealed users to any token that is not an owner.
