@@ -15,6 +15,7 @@ type User struct {
 	FirstName string
 	LastName  string
 	Email     string
+	Enabled   bool
 }
 
 type UserDatabase interface {
@@ -38,6 +39,7 @@ type ADUser struct {
 	Mail      string `json:"mail"`
 	GivenName string `json:"givenName"`
 	Surname   string `json:"surname"`
+	Enabled   bool   `json:"accountEnabled"`
 }
 
 type Populator struct {
@@ -53,41 +55,44 @@ func NewPopulator(clientID, clientSecret string) *Populator {
 }
 
 func (p *Populator) Populate(userDb UserDatabase) error {
-	userResps := p.getAllUsers()
-	for _, resp := range userResps {
-		for _, user := range resp.Value {
-			if user.Mail == "" {
-				fmt.Printf("skipping user: %+v\n", user)
-				continue
-			}
-			modelUser := &User{
-				FirstName: user.GivenName,
-				LastName:  user.Surname,
-				Email:     user.Mail,
-			}
-			err := userDb.Create(modelUser)
-			if err != nil {
-				// TODO: Create error type for array of errors to keep track of failures
-				fmt.Printf("error saving: %+v\n", err)
-				fmt.Printf("skipping user: %+v\n", user)
-			}
+	return p.populateAllUsers(userDb)
+}
+
+func (p *Populator) createUsers(resp *AzureADResponse, userDb UserDatabase) error {
+	for _, user := range resp.Value {
+		if user.Mail == "" {
+			fmt.Printf("[NO EMAIL] skipping user: %+v\n", user)
+			continue
+		}
+		modelUser := &User{
+			FirstName: user.GivenName,
+			LastName:  user.Surname,
+			Email:     user.Mail,
+			Enabled:   user.Enabled,
+		}
+		err := userDb.Create(modelUser)
+		if err != nil {
+			// TODO: Create error type for array of errors to keep track of failures
+			fmt.Printf("[ERROR] skipping user: %+v\n", user)
 		}
 	}
 	return nil
 }
 
-func (p *Populator) getAllUsers() []*AzureADResponse {
+func (p *Populator) populateAllUsers(userDb UserDatabase) error {
 	toke := p.getToken()
 	more := true
 	nextLinkReg := regexp.MustCompile("skiptoken=(.*)")
 
-	allResps := []*AzureADResponse{}
-	adResp := &AzureADResponse{}
 	nextLink := ""
 	iterations := 1
 	for more {
-		adResp = p.requestUsers(toke, nextLink)
-		allResps = append(allResps, adResp)
+		adResp := p.requestUsers(toke, nextLink)
+		err := p.createUsers(adResp, userDb)
+		if err != nil {
+			fmt.Printf("Could not create users: %+v\n", err)
+			return nil
+		}
 		matches := nextLinkReg.FindStringSubmatch(adResp.NextLink)
 		if len(matches) == 2 {
 			nextLink = matches[1]
@@ -97,9 +102,9 @@ func (p *Populator) getAllUsers() []*AzureADResponse {
 		if adResp.NextLink == "" {
 			more = false
 		}
-		iterations += 1
+		iterations++
 	}
-	return allResps
+	return nil
 }
 
 func (p *Populator) requestUsers(token *MSTokenResponse, skipToken string) *AzureADResponse {
