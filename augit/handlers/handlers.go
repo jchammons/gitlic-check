@@ -14,19 +14,20 @@ func getEmail(token *samlsp.AuthorizationToken) string {
 
 func ShowUser(ghudb models.GithubUserAccessor) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		email := getEmail(samlsp.Token(r.Context()))
 		user, err := ghudb.Find(email)
 		if err != nil {
-			log.Printf("Failed to create user. Error: %v\n", err)
+			log.Printf("Failed to find user. Error: %v\n", err)
 			w.WriteHeader(http.StatusBadGateway)
-			w.Write([]byte("Could not create user"))
+			w.Write([]byte(`{"error": "Could not find user"}`))
 			return
 		}
 		marshaledUser, err := json.Marshal(user)
 		if err != nil {
 			log.Printf("Failed to marshall user data. Error: %v\n", err)
 			w.WriteHeader(http.StatusBadGateway)
-			w.Write([]byte("Could not create user"))
+			w.Write([]byte(`{"error": "Could not find user"}`))
 			return
 		}
 		w.Write(marshaledUser)
@@ -39,12 +40,13 @@ type addUserRequest struct {
 
 func AddUser(ghudb models.GithubUserAccessor) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		var req addUserRequest
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			log.Printf("Failed to parse user data. Error: %v\n", err)
 			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte("Could not parse user payload"))
+			w.Write([]byte(`{"error": "Could not parse user payload"}`))
 			return
 		}
 
@@ -56,9 +58,9 @@ func AddUser(ghudb models.GithubUserAccessor) func(w http.ResponseWriter, r *htt
 		if err != nil {
 			log.Printf("Failed to create user. Error: %v\n", err)
 			w.WriteHeader(http.StatusBadGateway)
-			w.Write([]byte("Could not create user"))
+			w.Write([]byte(`{"error:" "Could not create user"}`))
 			return
 		}
-		w.WriteHeader(http.StatusCreated)
+		w.WriteHeader(http.StatusNoContent)
 	}
 }
