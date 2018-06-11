@@ -24,7 +24,7 @@ func getIgnoredMap(a []string) map[string]bool {
 func RunCheck(ctx context.Context, cf config, fo map[string]*os.File) {
 	ghClient := github.NewClient(oauth2.NewClient(ctx, oauth2.StaticTokenSource(&oauth2.Token{AccessToken: cf.Github.Token})))
 	lo := &github.ListOptions{PerPage: 100}
-	twoWeeks := time.Duration(cf.Github.RmInvitesAfter) * time.Hour
+	maxInviteT := time.Duration(cf.Github.RmInvitesAfter) * time.Hour
 	ignoredOrgs := getIgnoredMap(cf.Github.IgnoredOrgs)
 
 	log.Print("Working...\n\n")
@@ -65,42 +65,40 @@ func RunCheck(ctx context.Context, cf config, fo map[string]*os.File) {
 			continue
 		}
 
-		if cf.Github.RmInvitesAfter != 0 {
-			var invites []*github.Invitation
-			for {
-				partialInvites, resp, err := ghClient.Organizations.ListPendingOrgInvitations(ctx, *org.Login, lo)
-				if err != nil {
-					log.Printf("Organizations.ListPendingOrgInvitations failed with %s\n", err)
-					return
-				}
-
-				invites = append(invites, partialInvites...)
-
-				if resp.NextPage == 0 {
-					lo.Page = 1
-					break
-				}
-				lo.Page = resp.NextPage
+		var invites []*github.Invitation
+		for {
+			partialInvites, resp, err := ghClient.Organizations.ListPendingOrgInvitations(ctx, *org.Login, lo)
+			if err != nil {
+				log.Printf("Organizations.ListPendingOrgInvitations failed with %s\n", err)
+				return
 			}
 
-			if len(invites) > 0 {
-				for _, invite := range invites {
-					inviteDate := fmt.Sprint(int(invite.CreatedAt.Month()), "/", fmt.Sprintf("%02d", invite.CreatedAt.Day()), "/", invite.CreatedAt.Year())
-					tSinceInvite := time.Now().UTC().Sub(invite.CreatedAt.UTC())
-					if _, err := fo["invites.csv"].WriteString(fmt.Sprint(*org.Login, ",", *invite.Login, ",", inviteDate, ",", *invite.Inviter.Login)); err != nil {
-						log.Printf("Failed to write invite data for %s from %s to invite.csv\n", *invite.Login, *org.Login)
-					}
-					if tSinceInvite > twoWeeks {
-						_, err := ghClient.Organizations.RemoveOrgMembership(ctx, *invite.Login, *org.Login)
-						if err != nil {
-							log.Printf("Failed to remove flagged pending invitation for %s from org %s\n", *invite.Login, *org.Login)
-						} else {
-							fo["invites.csv"].WriteString(",True\n")
-						}
-						continue
-					}
-					fo["invites.csv"].WriteString(",\n")
+			invites = append(invites, partialInvites...)
+
+			if resp.NextPage == 0 {
+				lo.Page = 1
+				break
+			}
+			lo.Page = resp.NextPage
+		}
+
+		if len(invites) > 0 {
+			for _, invite := range invites {
+				inviteDate := fmt.Sprint(int(invite.CreatedAt.Month()), "/", fmt.Sprintf("%02d", invite.CreatedAt.Day()), "/", invite.CreatedAt.Year())
+				tSinceInvite := time.Now().UTC().Sub(invite.CreatedAt.UTC())
+				if _, err := fo["invites.csv"].WriteString(fmt.Sprint(*org.Login, ",", *invite.Login, ",", inviteDate, ",", *invite.Inviter.Login)); err != nil {
+					log.Printf("Failed to write invite data for %s from %s to invite.csv\n", *invite.Login, *org.Login)
 				}
+				if cf.Github.RmInvitesAfter != 0 && tSinceInvite > maxInviteT {
+					_, err := ghClient.Organizations.RemoveOrgMembership(ctx, *invite.Login, *org.Login)
+					if err != nil {
+						log.Printf("Failed to remove flagged pending invitation for %s from org %s\n", *invite.Login, *org.Login)
+					} else {
+						fo["invites.csv"].WriteString(",True\n")
+					}
+					continue
+				}
+				fo["invites.csv"].WriteString(",\n")
 			}
 		}
 
