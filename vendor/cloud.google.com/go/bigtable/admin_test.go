@@ -23,11 +23,10 @@ import (
 	"cloud.google.com/go/internal/testutil"
 
 	"fmt"
-	"strings"
-
 	"golang.org/x/net/context"
 	"google.golang.org/api/iterator"
 	btapb "google.golang.org/genproto/googleapis/bigtable/admin/v2"
+	"strings"
 )
 
 func TestAdminIntegration(t *testing.T) {
