@@ -7,6 +7,7 @@ import (
 type GithubUserAccessor interface {
 	Upsert(*GithubUser) error
 	Find(string) (*GithubUser, error)
+	FindByGithubID(string) (*GithubUser, error)
 }
 
 type GithubUserDB struct {
@@ -37,7 +38,14 @@ func (ghudb *GithubUserDB) Upsert(user *GithubUser) error {
 	return nil
 }
 
+// Find returns the user with the given email
 func (ghudb *GithubUserDB) Find(email string) (*GithubUser, error) {
 	foundUser := &GithubUser{}
 	return foundUser, ghudb.tx.Where("email = ?", email).First(foundUser)
+}
+
+// Find returns the user with the given email
+func (ghudb *GithubUserDB) FindByGithubID(email string) (*GithubUser, error) {
+	foundUser := &GithubUser{}
+	return foundUser, ghudb.tx.Where("github_id = ?", email).First(foundUser)
 }

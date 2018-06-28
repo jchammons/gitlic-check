@@ -43,7 +43,10 @@ drive: (optional)
 You'll need to generate a personal access token [in your GitHub settings](https://github.com/settings/tokens). If you want to include private repositories in your reports, be sure to select the entire repo scope in the token settings. If you want to ignore any orgs in the process of scanning, put their names in the optional array. Finally, if you want to automatically remove invitations after a certain amount of time, include that option and the time frame in hours.
 
 ##### Google Drive (optional)
-If you'd like to upload the resulting CSVs directly into a Google Drive folder, you'll need to create a service account in the [Google Developer Console](https://console.developers.google.com/apis/) and enable access to the Google Drive API. Place the JSON key file they provide in this folder and rename it `config-drive.json`.
+If you'd like to upload the resulting CSVs directly into a Google Drive folder, you'll need to create
+a service account in the [Google Developer Console](https://console.developers.google.com/apis/) and enable
+access to the Google Drive API. Place the JSON key file they provide in this folder and rename
+it `config-drive.json`.
 
 Then, include the _drive_ property in your config file with the ID of the output Google Drive folder. **Before running, you must share this folder with the email address of the service account**.
 

@@ -296,7 +296,8 @@
     "drive/v3",
     "gensupport",
     "googleapi",
-    "googleapi/internal/uritemplates"
+    "googleapi/internal/uritemplates",
+    "sheets/v4"
   ]
   revision = "3097bf831ede4a24e08a3316254e29ca726383e3"
 
@@ -326,6 +327,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "0ace254a0551a1a760bd9776929d138bae280abdd6699e2bfa4f2f34b39e8b47"
+  inputs-digest = "f69cd20eb36f22572eb40476c437912c803f8cba3d1b0cae0eef04c9daaac258"
   solver-name = "gps-cdcl"
   solver-version = 1

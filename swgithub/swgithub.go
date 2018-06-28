@@ -1,31 +1,15 @@
-package gitlic
+package swgithub
 
 import (
 	"context"
 	"fmt"
+	"github.com/google/go-github/github"
+	"github.com/solarwinds/gitlic-check/config"
+	"golang.org/x/oauth2"
 	"log"
 	"os"
 	"time"
-
-	"github.com/google/go-github/github"
-	"golang.org/x/oauth2"
 )
-
-type GhConfig struct {
-	Token          string   `json:"pat"`
-	IgnoredOrgs    []string `json:"ignoredOrgs,omitempty"`
-	RmInvitesAfter int      `json:"rmInvitesAfter,omitempty"` // in hours
-}
-
-type DriveConfig struct {
-	OutputDir       string `json:"outputDir"`
-	EnableTeamDrive bool   `json:"enableTeamDrive,omitempty"`
-}
-
-type Config struct {
-	Github *GhConfig    `json:"github,omitempty"`
-	Drive  *DriveConfig `json:"drive,omitempty"`
-}
 
 // getIgnoredMap will turn the array of ignored orgs from the config file into a map that is easy to check against as we iterate over organizations returned from the GitHub API
 func getIgnoredMap(a []string) map[string]bool {
@@ -36,12 +20,65 @@ func getIgnoredMap(a []string) map[string]bool {
 	return ignoredOrgs
 }
 
-// RunCheck begins the process of querying the GitHub API. It will loop through your organizations and their repositories and pull info on configuration, license, and users, including invitations. It will output the results to respective CSV files in the output folder. See the README for an idea of what these CSV reports contain.
-func RunCheck(ctx context.Context, cf Config, fo map[string]*os.File) {
+func GetSWOrgs(ctx context.Context, ghClient *github.Client, cf config.Config) ([]*github.Organization, error) {
+	ignoredOrgs := getIgnoredMap(cf.Github.IgnoredOrgs)
+	orgs := []*github.Organization{}
+	lo := &github.ListOptions{PerPage: 100}
+	for {
+		partialOrgs, resp, err := ghClient.Organizations.List(ctx, "", lo)
+		if err != nil {
+			log.Fatalf("Organizations.List failed with %s\n", err)
+			return nil, err
+		}
+
+		orgs = append(orgs, partialOrgs...)
+
+		if resp.NextPage == 0 {
+			lo.Page = 1
+			break
+		}
+		lo.Page = resp.NextPage
+	}
+	validOrgs := []*github.Organization{}
+	for _, org := range orgs {
+		if ignoredOrgs == nil {
+			validOrgs = orgs
+			break
+		}
+		if !ignoredOrgs[*org.Login] {
+			validOrgs = append(validOrgs, org)
+		} else {
+			log.Printf("Ignored %s\n", *org.Login)
+		}
+	}
+	return validOrgs, nil
+}
+
+func GetOrgMembers(ctx context.Context, ghClient *github.Client, org *github.Organization, opt *github.ListMembersOptions) ([]*github.User, error) {
+	members := []*github.User{}
+	for {
+		partialMembers, resp, err := ghClient.Organizations.ListMembers(ctx, *org.Login, opt)
+		if err != nil {
+			log.Printf("Organizations.ListMembers, no filter, failed with %s\n", err)
+			return nil, err
+		}
+
+		members = append(members, partialMembers...)
+
+		if resp.NextPage == 0 {
+			opt.Page = 1
+			break
+		}
+		opt.Page = resp.NextPage
+	}
+	return members, nil
+}
+
+// RunGitlicCheck begins the process of querying the GitHub API. It will loop through your organizations and their repositories and pull info on configuration, license, and users, including invitations. It will output the results to respective CSV files in the output folder. See the README for an idea of what these CSV reports contain.
+func RunGitlicCheck(ctx context.Context, cf config.Config, fo map[string]*os.File) {
 	ghClient := github.NewClient(oauth2.NewClient(ctx, oauth2.StaticTokenSource(&oauth2.Token{AccessToken: cf.Github.Token})))
 	lo := &github.ListOptions{PerPage: 100}
 	maxInviteT := time.Duration(cf.Github.RmInvitesAfter) * time.Hour
-	ignoredOrgs := getIgnoredMap(cf.Github.IgnoredOrgs)
 
 	log.Print("Working...\n\n")
 
@@ -57,30 +94,12 @@ func RunCheck(ctx context.Context, cf Config, fo map[string]*os.File) {
 		log.Printf("Initial save to invites CSV failed with %s\n", err)
 	}
 
-	var orgs []*github.Organization
-
-	for {
-		partialOrgs, resp, err := ghClient.Organizations.List(ctx, "", lo)
-		if err != nil {
-			log.Fatalf("Organizations.List failed with %s\n", err)
-			return
-		}
-
-		orgs = append(orgs, partialOrgs...)
-
-		if resp.NextPage == 0 {
-			lo.Page = 1
-			break
-		}
-		lo.Page = resp.NextPage
+	orgs, err := GetSWOrgs(ctx, ghClient, cf)
+	if err != nil {
+		log.Printf("Could not get orgs: %s", err.Error())
+		return
 	}
-
 	for i, org := range orgs {
-		if ignoredOrgs != nil && ignoredOrgs[*org.Login] {
-			log.Printf("Ignored %s, %d of %d\n", *org.Login, i+1, len(orgs))
-			continue
-		}
-
 		var invites []*github.Invitation
 		for {
 			partialInvites, resp, err := ghClient.Organizations.ListPendingOrgInvitations(ctx, *org.Login, lo)
@@ -155,47 +174,19 @@ func RunCheck(ctx context.Context, cf Config, fo map[string]*os.File) {
 			}
 		}
 
-		var members []*github.User
-		memOpt := &github.ListMembersOptions{
-			ListOptions: *lo,
+		memOpt := &github.ListMembersOptions{ListOptions: *lo}
+		members, err := GetOrgMembers(ctx, ghClient, org, memOpt)
+		if err != nil {
+			log.Printf("Couldn't get org members, no filter, for %s: %s", *org.Login, err.Error())
 		}
 
-		var membersNo2f []*github.User
 		no2fOpt := &github.ListMembersOptions{
 			Filter:      "2fa_disabled",
 			ListOptions: *lo,
 		}
-
-		for {
-			partialMembers, resp, err := ghClient.Organizations.ListMembers(ctx, *org.Login, memOpt)
-			if err != nil {
-				log.Printf("Organizations.ListMembers, no filter, failed with %s\n", err)
-				break
-			}
-
-			members = append(members, partialMembers...)
-
-			if resp.NextPage == 0 {
-				memOpt.Page = 1
-				break
-			}
-			memOpt.Page = resp.NextPage
-		}
-
-		for {
-			partialNo2f, resp, err := ghClient.Organizations.ListMembers(ctx, *org.Login, no2fOpt)
-			if err != nil {
-				log.Printf("Organizations.ListMembers, 2FA filter, failed with %s\n", err)
-				break
-			}
-
-			membersNo2f = append(membersNo2f, partialNo2f...)
-
-			if resp.NextPage == 0 {
-				no2fOpt.Page = 1
-				break
-			}
-			no2fOpt.Page = resp.NextPage
+		membersNo2f, err := GetOrgMembers(ctx, ghClient, org, no2fOpt)
+		if err != nil {
+			log.Printf("Couldn't get org members, 2fa filter, for %s: %s", *org.Login, err.Error())
 		}
 
 		membersFilter := make(map[string]bool)
