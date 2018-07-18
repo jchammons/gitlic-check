@@ -44,8 +44,8 @@ func (ghudb *GithubUserDB) Find(email string) (*GithubUser, error) {
 	return foundUser, ghudb.tx.Where("email = ?", email).First(foundUser)
 }
 
-// Find returns the user with the given email
-func (ghudb *GithubUserDB) FindByGithubID(email string) (*GithubUser, error) {
+// Find returns the user with the given GitHub ID
+func (ghudb *GithubUserDB) FindByGithubID(ghID string) (*GithubUser, error) {
 	foundUser := &GithubUser{}
-	return foundUser, ghudb.tx.Where("github_id = ?", email).First(foundUser)
+	return foundUser, ghudb.tx.Where("github_id = ?", ghID).First(foundUser)
 }

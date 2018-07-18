@@ -4,12 +4,13 @@ import (
 	"fmt"
 
 	"errors"
+	"log"
+	"os"
+
 	"github.com/gobuffalo/pop"
 	"github.com/solarwinds/gitlic-check/augit/models"
 	swio "github.com/solarwinds/swio-users"
 	"github.com/spf13/cobra"
-	"log"
-	"os"
 )
 
 // populateCmd represents the populate command

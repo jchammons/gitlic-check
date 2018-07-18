@@ -4,6 +4,11 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"log"
+	"net/http"
+	"net/url"
+	"os"
+
 	"github.com/gobuffalo/pop"
 	gorillaHandlers "github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
@@ -11,10 +16,6 @@ import (
 	"github.com/solarwinds/gitlic-check/augit/models"
 	"github.com/solarwinds/saml/samlsp"
 	"github.com/spf13/cobra"
-	"log"
-	"net/http"
-	"net/url"
-	"os"
 )
 
 var serveCmd = &cobra.Command{
@@ -73,11 +74,14 @@ func augitHandlers(tx *pop.Connection) *mux.Router {
 	r := mux.NewRouter()
 	augit := r.PathPrefix("/augit").Subrouter()
 	ghudb := models.NewGithubUserDB(tx)
+	sadb := models.NewServiceAccountDB(tx)
 
 	r.Handle("/", http.HandlerFunc(healthCheck())).Methods("GET")
 	augit.Handle("/saml/acs", sp)
 	augit.Handle("/user", sp.RequireAccount(http.HandlerFunc(handlers.ShowUser(ghudb)))).Methods("GET")
 	augit.Handle("/user", sp.RequireAccount(http.HandlerFunc(handlers.AddUser(ghudb)))).Methods("POST")
+	augit.Handle("/service_account", sp.RequireAccount(http.HandlerFunc(handlers.AddServiceAccount(ghudb, sadb)))).Methods("POST")
+	augit.Handle("/check_admin", sp.RequireAccount(http.HandlerFunc(handlers.CheckAdmin(ghudb)))).Methods("GET")
 	return r
 }
 

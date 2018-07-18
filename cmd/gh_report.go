@@ -2,6 +2,9 @@ package cmd
 
 import (
 	"context"
+	"log"
+	"os"
+
 	"github.com/gobuffalo/pop"
 	"github.com/google/go-github/github"
 	"github.com/solarwinds/gitlic-check/augit/models"
@@ -10,8 +13,6 @@ import (
 	"github.com/solarwinds/gitlic-check/swgithub"
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2"
-	"log"
-	"os"
 )
 
 var ghReportCmd = &cobra.Command{

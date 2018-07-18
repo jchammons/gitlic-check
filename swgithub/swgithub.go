@@ -3,12 +3,13 @@ package swgithub
 import (
 	"context"
 	"fmt"
-	"github.com/google/go-github/github"
-	"github.com/solarwinds/gitlic-check/config"
-	"golang.org/x/oauth2"
 	"log"
 	"os"
 	"time"
+
+	"github.com/google/go-github/github"
+	"github.com/solarwinds/gitlic-check/config"
+	"golang.org/x/oauth2"
 )
 
 // getIgnoredMap will turn the array of ignored orgs from the config file into a map that is easy to check against as we iterate over organizations returned from the GitHub API

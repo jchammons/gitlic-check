@@ -3,13 +3,14 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io"
+	"log"
+	"os"
+
 	"github.com/solarwinds/gitlic-check/config"
 	"github.com/solarwinds/gitlic-check/gitlic"
 	"github.com/solarwinds/gitlic-check/swgithub"
 	"github.com/spf13/cobra"
-	"io"
-	"log"
-	"os"
 )
 
 var (
