@@ -15,10 +15,7 @@ type User struct {
 	FirstName string
 	LastName  string
 	Email     string
-}
-
-type UserDatabase interface {
-	Create(*User) error
+	Enabled   bool
 }
 
 type MSTokenResponse struct {
@@ -38,71 +35,63 @@ type ADUser struct {
 	Mail      string `json:"mail"`
 	GivenName string `json:"givenName"`
 	Surname   string `json:"surname"`
+	Enabled   bool   `json:"accountEnabled"`
 }
 
 type Populator struct {
 	clientID     string
 	clientSecret string
+	more         bool
+	token        *MSTokenResponse
+	nextLink     string
 }
 
 func NewPopulator(clientID, clientSecret string) *Populator {
 	return &Populator{
 		clientID:     clientID,
 		clientSecret: clientSecret,
+		more:         true,
 	}
 }
 
-func (p *Populator) Populate(userDb UserDatabase) error {
-	userResps := p.getAllUsers()
-	for _, resp := range userResps {
-		for _, user := range resp.Value {
-			if user.Mail == "" {
-				fmt.Printf("skipping user: %+v\n", user)
-				continue
-			}
-			modelUser := &User{
-				FirstName: user.GivenName,
-				LastName:  user.Surname,
-				Email:     user.Mail,
-			}
-			err := userDb.Create(modelUser)
-			if err != nil {
-				// TODO: Create error type for array of errors to keep track of failures
-				fmt.Printf("error saving: %+v\n", err)
-				fmt.Printf("skipping user: %+v\n", user)
-			}
-		}
-	}
-	return nil
+func (p *Populator) MoreUsers() bool {
+	return p.more
 }
 
-func (p *Populator) getAllUsers() []*AzureADResponse {
+func (p *Populator) GetUsers() ([]*User, error) {
 	toke := p.getToken()
-	more := true
-	nextLinkReg := regexp.MustCompile("skiptoken=(.*)")
-
-	allResps := []*AzureADResponse{}
-	adResp := &AzureADResponse{}
-	nextLink := ""
-	iterations := 1
-	for more {
-		adResp = p.requestUsers(toke, nextLink)
-		allResps = append(allResps, adResp)
-		matches := nextLinkReg.FindStringSubmatch(adResp.NextLink)
-		if len(matches) == 2 {
-			nextLink = matches[1]
-		} else {
-			nextLink = ""
-		}
-		if adResp.NextLink == "" {
-			more = false
-		}
-		iterations += 1
+	adResp, err := p.requestUsers(toke, p.nextLink)
+	if err != nil {
+		return nil, err
 	}
-	return allResps
+	users := []*User{}
+	for _, user := range adResp.Value {
+		if user.Mail == "" {
+			fmt.Printf("[NO EMAIL] skipping user: %+v\n", user)
+			continue
+		}
+		users = append(users, &User{
+			FirstName: user.GivenName,
+			LastName:  user.Surname,
+			Email:     user.Mail,
+			Enabled:   user.Enabled,
+		})
+	}
+
+	nextLinkReg := regexp.MustCompile("skiptoken=(.*)")
+	matches := nextLinkReg.FindStringSubmatch(adResp.NextLink)
+	if len(matches) == 2 {
+		p.nextLink = matches[1]
+	} else {
+		p.nextLink = ""
+	}
+	if adResp.NextLink == "" {
+		p.more = false
+	}
+	return users, nil
 }
 
-func (p *Populator) requestUsers(token *MSTokenResponse, skipToken string) *AzureADResponse {
+func (p *Populator) requestUsers(token *MSTokenResponse, skipToken string) (*AzureADResponse, error) {
 	client := &http.Client{}
 	req, _ := http.NewRequest("GET", "https://graph.windows.net/solarwinds.com/users?api-version=1.6&$top=999", nil)
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
@@ -120,21 +109,24 @@ func (p *Populator) requestUsers(token *MSTokenResponse, skipToken string) *Azur
 	fmt.Println("Requesting with ", req.URL.String())
 	usersResp, err := client.Do(req)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	body, err := ioutil.ReadAll(usersResp.Body)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	adResp := &AzureADResponse{}
 	err = json.Unmarshal(body, adResp)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-	return adResp
+	return adResp, nil
 }
 
 func (p *Populator) getToken() *MSTokenResponse {
+	if p.token != nil {
+		return p.token
+	}
 	data := url.Values{}
 	data.Set("client_id", p.clientID)
 	data.Set("client_secret", p.clientSecret)
@@ -153,5 +145,6 @@ func (p *Populator) getToken() *MSTokenResponse {
 	if err != nil {
 		log.Fatal(err)
 	}
+	p.token = response
 	return response
 }

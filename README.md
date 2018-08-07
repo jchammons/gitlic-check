@@ -43,7 +43,10 @@ drive: (optional)
 You'll need to generate a personal access token [in your GitHub settings](https://github.com/settings/tokens). If you want to include private repositories in your reports, be sure to select the entire repo scope in the token settings. If you want to ignore any orgs in the process of scanning, put their names in the optional array. Finally, if you want to automatically remove invitations after a certain amount of time, include that option and the time frame in hours.
 
 ##### Google Drive (optional)
-If you'd like to upload the resulting CSVs directly into a Google Drive folder, you'll need to create a service account in the [Google Developer Console](https://console.developers.google.com/apis/) and enable access to the Google Drive API. Place the JSON key file they provide in this folder and rename it `config-drive.json`.
+If you'd like to upload the resulting CSVs directly into a Google Drive folder, you'll need to create
+a service account in the [Google Developer Console](https://console.developers.google.com/apis/) and enable
+access to the Google Drive API. Place the JSON key file they provide in this folder and rename
+it `config-drive.json`.
 
 Then, include the _drive_ property in your config file with the ID of the output Google Drive folder. **Before running, you must share this folder with the email address of the service account**.
 
@@ -88,3 +91,18 @@ _invites.csv_
 Org,User,Date Sent,Invited By,Deleted
 org-name,user-name,2018-03-15,user-name,true
 ```
+
+## Augit
+Augit provides functionality to ensure that no GitHub account has access to SolarWinds repos unless they are an approved
+and active employee or an approved bot account. This is accomplished by checking the list of active GitHub users in SolarWinds
+organizations against a database of SolarWinds employees retrieved from Azure Active Directory. The Azure AD integration
+is facilitated by the [swio-users](https://github.com/solarwinds/swio-users) repo, also used by Kudos and other
+SolarWinds.io-related projects.
+
+### Populating the Database
+The `populate` subcommand will use your database.yml and env vars for ENVIRONMENT, DATABASE_URL (if production environment),
+AD_CLIENT_ID, and AD_SECRET to populate your database with all enabled users from Active Directory. In the future it will also remove folks who are no longer enabled or in AD.
+
+### Prerequisites for Completion
+Augit relies on the personal access token of a user having *owner* level access to each SolarWinds repo. This is
+required because the GitHub API will not return concealed users to any token that is not an owner.

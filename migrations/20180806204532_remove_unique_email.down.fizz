@@ -1,0 +1,1 @@
+add_index("github_users", "email", {"unique": true})
