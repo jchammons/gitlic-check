@@ -35,6 +35,27 @@ func ShowUser(ghudb models.GithubUserAccessor) func(w http.ResponseWriter, r *ht
 	}
 }
 
+func ShowGHUsers(ghudb models.GithubUserAccessor) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		users, err := ghudb.ListGHUsers()
+		if err != nil {
+			log.Printf("Failed to find users. Error: %v\n", err)
+			w.WriteHeader(http.StatusBadGateway)
+			w.Write([]byte(`{"error": "Could not find users"}`))
+			return
+		}
+		marshaledUsers, err := json.Marshal(users)
+		if err != nil {
+			log.Printf("Failed to marshall user data. Error: %v\n", err)
+			w.WriteHeader(http.StatusBadGateway)
+			w.Write([]byte(`{"error": "Could not find users"}`))
+			return
+		}
+		w.Write(marshaledUsers)
+	}
+}
+
 type addGHRequest struct {
 	GithubID string `json:"github_id"`
 }
@@ -55,7 +76,7 @@ func AddUser(ghudb models.GithubUserAccessor) func(w http.ResponseWriter, r *htt
 			Email:    getEmail(samlsp.Token(r.Context())),
 			GithubID: req.GithubID,
 		}
-		err = ghudb.Upsert(updateUser)
+		err = ghudb.ReplaceGHRow(updateUser)
 		if err != nil {
 			log.Printf("Failed to create user. Error: %v\n", err)
 			w.WriteHeader(http.StatusBadGateway)

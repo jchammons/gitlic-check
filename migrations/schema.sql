@@ -43,7 +43,8 @@ CREATE TABLE public.github_users (
     github_id character varying(255) NOT NULL,
     name character varying(255) NOT NULL,
     created_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL
+    updated_at timestamp without time zone NOT NULL,
+    admin boolean DEFAULT false NOT NULL
 );
 
 
@@ -89,13 +90,6 @@ ALTER TABLE ONLY public.github_users
 
 ALTER TABLE ONLY public.service_accounts
     ADD CONSTRAINT service_accounts_pkey PRIMARY KEY (id);
-
-
---
--- Name: github_users_email_idx; Type: INDEX; Schema: public; Owner: alex
---
-
-CREATE UNIQUE INDEX github_users_email_idx ON public.github_users USING btree (email);
 
 
 --

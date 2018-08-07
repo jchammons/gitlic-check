@@ -3,14 +3,15 @@ apiVersion: apps/v1beta2
 metadata:
   name: augit
   namespace: solarwindsio
-  labels:
-    app: augit-server
 spec:
   replicas: 1
   selector:
     matchLabels:
       app: augit-server
   template:
+    metadata:
+      labels:
+        app: augit-server
     spec:
       volumes:
         - name: config
@@ -44,9 +45,12 @@ spec:
             - name: PORT
               value: ':8080'
             - name: ROOT_URL
-              value: 'https://staging.solarwinds.io'
+              value: 'https://solarwinds.io'
             - name: IDP_METADATA_URL
-              value: 'https://swi.okta.com/app/exk1dzsokojGbiGFi1d8/sso/saml/metadata'
+              valueFrom:
+                secretKeyRef:
+                  name: augit-idp-url
+                  key: value
             - name: CERT_FILE
               value: /config/tls.crt
             - name: KEY_FILE
@@ -54,9 +58,15 @@ spec:
             - name: ENVIRONMENT
               value: production
             - name: COOKIENAME
-              value: staging
+              valueFrom:
+                configMapKeyRef:
+                  name: solarwindsio-configs
+                  key: cookie-name
             - name: DATABASE_URL
-              value: 
+              valueFrom:
+                secretKeyRef:
+                  name: augit-db
+                  key: url
           ports:
             - containerPort: 8080
               protocol: TCP

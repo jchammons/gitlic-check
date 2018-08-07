@@ -9,7 +9,6 @@ import (
 	"github.com/google/go-github/github"
 	"github.com/solarwinds/gitlic-check/augit/models"
 	"github.com/solarwinds/gitlic-check/config"
-	"github.com/solarwinds/gitlic-check/gitlic"
 	"github.com/solarwinds/gitlic-check/swgithub"
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2"
@@ -54,24 +53,23 @@ func generateReport(ghudb models.GithubUserAccessor) error {
 		allMembers = append(allMembers, members...)
 	}
 
-	dedupedMembers := map[string]string{}
 	for _, member := range allMembers {
 		if member.Login == nil {
 			continue
 		}
-		swUser, err := ghudb.FindByGithubID(*member.Login)
-		if err != nil {
-			if !models.IsErrRecordNotFound(err) {
-				return err
-			}
+		exists, err := ghudb.ExistsByGithubID(*member.Login)
+		if exists {
+			continue
 		}
-		dedupedMembers[*member.Login] = swUser.Email
+		if err != nil {
+			return err
+		}
+		err = ghudb.Create(&models.GithubUser{
+			GithubID: *member.Login,
+		})
+		if err != nil {
+			return err
+		}
 	}
-
-	swGhUserRows := [][]interface{}{}
-	for ghId, email := range dedupedMembers {
-		swGhUserRows = append(swGhUserRows, []interface{}{ghId, email})
-	}
-	err = gitlic.UploadToSheets(swGhUserRows, cf.Drive)
 	return err
 }
