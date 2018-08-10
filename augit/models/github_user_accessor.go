@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"github.com/gobuffalo/pop"
 )
 
@@ -43,6 +44,9 @@ func (ghudb *GithubUserDB) Upsert(user *GithubUser) error {
 
 func (ghudb *GithubUserDB) ReplaceGHRow(inUser *GithubUser) error {
 	return ghudb.tx.Transaction(func(tx *pop.Connection) error {
+		if inUser.GithubID == "" {
+			return errors.New("must provide a GitHub ID")
+		}
 		existingGHRow := &GithubUser{}
 		err := ghudb.tx.Where("github_id = ?", inUser.GithubID).First(existingGHRow)
 		if err != nil {
@@ -54,11 +58,9 @@ func (ghudb *GithubUserDB) ReplaceGHRow(inUser *GithubUser) error {
 		if err != nil {
 			return err
 		}
-
 		// Update the existing row with the GH ID
-		if inUser.GithubID != "" {
-			existingUser.GithubID = inUser.GithubID
-		}
+		existingUser.GithubID = inUser.GithubID
+
 		vErrs, err := tx.ValidateAndUpdate(existingUser)
 		if vErrs.HasAny() {
 			return vErrs
