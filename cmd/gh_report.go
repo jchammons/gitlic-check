@@ -16,14 +16,14 @@ import (
 
 var ghReportCmd = &cobra.Command{
 	Use:   "gh-report",
-	Short: "gh-report generates and uploads a list of GH users in SolarWinds organizations alongside their SolarWinds emails if we have them",
+	Short: "gh-report generates and persists a list of GH users in SolarWinds organizations",
 	Run: func(cmd *cobra.Command, args []string) {
 		cxn, err := pop.Connect(os.Getenv("ENVIRONMENT"))
 		if err != nil {
 			log.Fatal(err)
 		}
 		ghudb := models.NewGithubUserDB(cxn)
-		err = generateReport(ghudb)
+		err = persistUsers(ghudb)
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -34,7 +34,9 @@ func init() {
 	rootCmd.AddCommand(ghReportCmd)
 }
 
-func generateReport(ghudb models.GithubUserAccessor) error {
+// persistUsers gets all of the users for all relevant organizations and saves them to the Augit db.
+// If they already exist in the db it is a no-op. This is intended to be run regularly.
+func persistUsers(ghudb models.GithubUserAccessor) error {
 	ctx := context.Background()
 	cf := config.GetConfig()
 	ghClient := github.NewClient(oauth2.NewClient(ctx, oauth2.StaticTokenSource(&oauth2.Token{AccessToken: cf.Github.Token})))

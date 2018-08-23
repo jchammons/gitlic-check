@@ -79,7 +79,7 @@ func augitHandlers(tx *pop.Connection) *mux.Router {
 	r.Handle("/", http.HandlerFunc(healthCheck())).Methods("GET")
 	r.Handle("/saml/acs", sp)
 	augit.Handle("/user", sp.RequireAccount(http.HandlerFunc(handlers.ShowUser(ghudb)))).Methods("GET")
-	augit.Handle("/users", sp.RequireAccount(http.HandlerFunc(handlers.ShowGHUsers(ghudb)))).Methods("GET")
+	augit.Handle("/users", sp.RequireAccount(http.HandlerFunc(handlers.ShowAccounts(ghudb, sadb)))).Methods("GET")
 	augit.Handle("/user", sp.RequireAccount(http.HandlerFunc(handlers.AddUser(ghudb)))).Methods("POST")
 	augit.Handle("/service_account", sp.RequireAccount(http.HandlerFunc(handlers.AddServiceAccount(ghudb, sadb)))).Methods("POST")
 	augit.Handle("/check_admin", sp.RequireAccount(http.HandlerFunc(handlers.CheckAdmin(ghudb)))).Methods("GET")

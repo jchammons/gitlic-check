@@ -5,6 +5,7 @@ import "github.com/gobuffalo/pop"
 type ServiceAccountAccessor interface {
 	Upsert(*ServiceAccount) error
 	FindByGithubID(string) (*ServiceAccount, error)
+	List() ([]*ServiceAccount, error)
 }
 
 type ServiceAccountDB struct {
@@ -36,4 +37,9 @@ func (sadb *ServiceAccountDB) Upsert(acct *ServiceAccount) error {
 func (sadb *ServiceAccountDB) FindByGithubID(ghID string) (*ServiceAccount, error) {
 	foundAcct := &ServiceAccount{}
 	return foundAcct, sadb.tx.Where("github_id = ?", ghID).First(foundAcct)
+}
+
+func (sadb *ServiceAccountDB) List() ([]*ServiceAccount, error) {
+	accts := []*ServiceAccount{}
+	return accts, sadb.tx.All(&accts)
 }

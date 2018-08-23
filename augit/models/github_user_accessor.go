@@ -12,6 +12,7 @@ type GithubUserAccessor interface {
 	Find(string) (*GithubUser, error)
 	ExistsByGithubID(string) (bool, error)
 	ListGHUsers() ([]*GithubUser, error)
+	Delete(string) error
 }
 
 type GithubUserDB struct {
@@ -90,4 +91,14 @@ func (ghudb *GithubUserDB) Create(inUser *GithubUser) error {
 func (ghudb *GithubUserDB) ListGHUsers() ([]*GithubUser, error) {
 	users := []*GithubUser{}
 	return users, ghudb.tx.Where("github_id != ''").All(&users)
+}
+
+func (ghudb *GithubUserDB) Delete(ghID string) error {
+	foundUser := &GithubUser{}
+	err := ghudb.tx.Where("github_id = ?", ghID).First(foundUser)
+	if err != nil {
+		return err
+	}
+
+	return ghudb.tx.Destroy(foundUser)
 }
