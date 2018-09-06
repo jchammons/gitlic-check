@@ -45,6 +45,7 @@ func persistUsers(ghudb models.GithubUserAccessor) error {
 		return err
 	}
 	allMembers := []*github.User{}
+	allOwners := []*github.User{}
 	for _, org := range orgs {
 		lo := &github.ListOptions{PerPage: 100}
 		memOpt := &github.ListMembersOptions{ListOptions: *lo}
@@ -53,6 +54,12 @@ func persistUsers(ghudb models.GithubUserAccessor) error {
 			log.Printf("Couldn't get org members, no filter, for %s: %s", *org.Login, err.Error())
 		}
 		allMembers = append(allMembers, members...)
+
+		owners, err := swgithub.GetOrgOwners(ctx, ghClient, org)
+		if err != nil {
+			log.Printf("Couldn't get org owners for %s: %s", *org.Login, err.Error())
+		}
+		allOwners = append(allOwners, owners...)
 	}
 
 	for _, member := range allMembers {
@@ -69,6 +76,15 @@ func persistUsers(ghudb models.GithubUserAccessor) error {
 		err = ghudb.Create(&models.GithubUser{
 			GithubID: *member.Login,
 		})
+		if err != nil {
+			return err
+		}
+	}
+	for _, owner := range allOwners {
+		if owner.Login == nil {
+			continue
+		}
+		err = ghudb.MakeOwner(*owner.Login)
 		if err != nil {
 			return err
 		}

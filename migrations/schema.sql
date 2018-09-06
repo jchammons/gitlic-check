@@ -44,7 +44,8 @@ CREATE TABLE public.github_users (
     name character varying(255) NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    admin boolean DEFAULT false NOT NULL
+    admin boolean DEFAULT false NOT NULL,
+    owner boolean DEFAULT false NOT NULL
 );
 
 

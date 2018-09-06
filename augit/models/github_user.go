@@ -18,6 +18,7 @@ type GithubUser struct {
 	GithubID  string    `json:"github_id" db:"github_id"`
 	Name      string    `json:"name" db:"name"`
 	Admin     bool      `json:"admin" db:"admin"`
+	Owner     bool      `json:"owner" db:"owner"`
 }
 
 // String is not required by pop and may be deleted

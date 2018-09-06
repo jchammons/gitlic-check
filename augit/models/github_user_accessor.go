@@ -15,6 +15,7 @@ type GithubUserAccessor interface {
 	Delete(string) error
 	AddAdmin(string) error
 	RemoveAdmin(string) error
+	MakeOwner(string) error
 }
 
 type GithubUserDB struct {
@@ -122,5 +123,16 @@ func (ghudb *GithubUserDB) RemoveAdmin(email string) error {
 		return err
 	}
 	foundUser.Admin = false
+	return ghudb.tx.Update(foundUser)
+}
+
+func (ghudb *GithubUserDB) MakeOwner(ghID string) error {
+	foundUser := &GithubUser{}
+	err := ghudb.tx.Where("github_id = ?", ghID).First(foundUser)
+	if err != nil {
+		return err
+	}
+
+	foundUser.Owner = true
 	return ghudb.tx.Update(foundUser)
 }

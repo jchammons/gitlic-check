@@ -75,6 +75,31 @@ func GetOrgMembers(ctx context.Context, ghClient *github.Client, org *github.Org
 	return members, nil
 }
 
+func GetOrgOwners(ctx context.Context, ghClient *github.Client, org *github.Organization) ([]*github.User, error) {
+	lo := &github.ListOptions{PerPage: 100}
+	memOpt := &github.ListMembersOptions{
+		ListOptions: *lo,
+		Role:        "admin",
+	}
+	members := []*github.User{}
+	for {
+		partialMembers, resp, err := ghClient.Organizations.ListMembers(ctx, *org.Login, memOpt)
+		if err != nil {
+			log.Printf("Organizations.ListMembers, only admin, failed with %s\n", err)
+			return nil, err
+		}
+
+		members = append(members, partialMembers...)
+
+		if resp.NextPage == 0 {
+			memOpt.Page = 1
+			break
+		}
+		memOpt.Page = resp.NextPage
+	}
+	return members, nil
+}
+
 // RunGitlicCheck begins the process of querying the GitHub API. It will loop through your organizations and their repositories and pull info on configuration, license, and users, including invitations. It will output the results to respective CSV files in the output folder. See the README for an idea of what these CSV reports contain.
 func RunGitlicCheck(ctx context.Context, cf config.Config, fo map[string]*os.File) {
 	ghClient := github.NewClient(oauth2.NewClient(ctx, oauth2.StaticTokenSource(&oauth2.Token{AccessToken: cf.Github.Token})))
