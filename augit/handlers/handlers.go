@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/gorilla/mux"
 	"github.com/solarwinds/gitlic-check/augit/models"
 	"github.com/solarwinds/saml/samlsp"
 )
@@ -24,7 +25,7 @@ func ShowUser(ghudb models.GithubUserAccessor) func(w http.ResponseWriter, r *ht
 		email := getEmail(samlsp.Token(r.Context()))
 		user, err := ghudb.Find(email)
 		if err != nil {
-			log.Printf("Failed to find user. Error: %v\n", err)
+			log.Printf("Failed to find user with email %s. Error: %v\n", email, err)
 			w.WriteHeader(http.StatusBadGateway)
 			w.Write([]byte(`{"error": "Could not find user"}`))
 			return
@@ -171,5 +172,85 @@ func AddServiceAccount(ghudb models.GithubUserAccessor, sadb models.ServiceAccou
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func AddAdmin(ghudb models.GithubUserAccessor) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		email := getEmail(samlsp.Token(r.Context()))
+		user, err := ghudb.Find(email)
+		if err != nil {
+			log.Printf("Failed to find user. Error: %v\n", err)
+			w.WriteHeader(http.StatusBadGateway)
+			w.Write([]byte(`{"error": "Could not find user"}`))
+			return
+		}
+		if !user.Admin {
+			log.Printf("Non-admin attempted to add admin: %s", user.Email)
+			w.WriteHeader(http.StatusForbidden)
+			w.Write([]byte(`{"error": "Must be admin to add admin"}`))
+			return
+		}
+
+		adminEmail, ok := vars["email"]
+		if !ok {
+			http.Error(w, "must supply an email for new admin", http.StatusBadRequest)
+			return
+		}
+		err = ghudb.AddAdmin(adminEmail)
+		if err != nil {
+			if models.IsErrRecordNotFound(err) {
+				log.Printf("error adding admin %s; email not registered\n", adminEmail)
+				w.WriteHeader(http.StatusBadRequest)
+				w.Write([]byte(`{"error": "User with requested email not found"}`))
+				return
+			}
+			log.Printf("error adding admin for %s: %s\n", adminEmail, err.Error())
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		log.Printf("admin %s added admin privileges to %s", user.Email, adminEmail)
+		w.WriteHeader(http.StatusCreated)
+	}
+}
+
+func RemoveAdmin(ghudb models.GithubUserAccessor) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		email := getEmail(samlsp.Token(r.Context()))
+		user, err := ghudb.Find(email)
+		if err != nil {
+			log.Printf("Failed to find user. Error: %v\n", err)
+			w.WriteHeader(http.StatusBadGateway)
+			w.Write([]byte(`{"error": "Could not find user"}`))
+			return
+		}
+		if !user.Admin {
+			log.Printf("Non-admin attempted to add admin: %s", user.Email)
+			w.WriteHeader(http.StatusForbidden)
+			w.Write([]byte(`{"error": "Must be admin to remove admin"}`))
+			return
+		}
+
+		adminEmail, ok := vars["email"]
+		if !ok {
+			http.Error(w, "must supply an email for deleted admin", http.StatusBadRequest)
+			return
+		}
+		err = ghudb.RemoveAdmin(adminEmail)
+		if err != nil {
+			if models.IsErrRecordNotFound(err) {
+				log.Printf("error removing admin %s; email not registered\n", adminEmail)
+				w.WriteHeader(http.StatusBadRequest)
+				w.Write([]byte(`{"error": "User with requested email not found"}`))
+				return
+			}
+			log.Printf("error removing admin for %s: %s\n", adminEmail, err.Error())
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		log.Printf("admin %s removed admin privileges from %s", user.Email, adminEmail)
+		w.WriteHeader(http.StatusCreated)
 	}
 }

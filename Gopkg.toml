@@ -25,3 +25,11 @@
 [[constraint]]
   name = "github.com/solarwinds/swio-users"
   version = "0.2.0"
+
+[[constraint]]
+  name = "github.com/appoptics/appoptics-apm-go"
+  version = "1.2.0"
+
+ [[override]]
+   name = "github.com/golang/protobuf"
+   version = "v1.2.0"

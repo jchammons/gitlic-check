@@ -1,0 +1,50 @@
+language: go
+
+go:
+  - 1.7
+  - 1.8
+  - 1.9
+
+env:
+  global:
+    - GO15VENDOREXPERIMENT=1
+    - APPOPTICS_DEBUG_LEVEL=1
+
+install:
+  - go get golang.org/x/tools/cmd/cover
+  - go get github.com/mattn/goveralls
+  - go get github.com/wadey/gocovmerge
+  - go get golang.org/x/net/context github.com/stretchr/testify/assert gopkg.in/mgo.v2/bson
+  - go get github.com/opentracing/opentracing-go
+  - go get google.golang.org/grpc
+  - go get github.com/uluyol/hdrhist
+
+script:
+  - cd $GOPATH/src/github.com/appoptics/appoptics-apm-go/v1/ao
+  - go build -v github.com/appoptics/appoptics-apm-go/v1/ao github.com/appoptics/appoptics-apm-go/v1/ao/internal/reporter github.com/appoptics/appoptics-apm-go/v1/ao/internal/log github.com/appoptics/appoptics-apm-go/v1/ao/internal/config github.com/appoptics/appoptics-apm-go/v1/ao/internal/host
+  - go test -v -race -covermode=atomic -coverprofile=cov.out -coverpkg github.com/appoptics/appoptics-apm-go/v1/ao/internal/reporter,github.com/appoptics/appoptics-apm-go/v1/ao/internal/log,github.com/appoptics/appoptics-apm-go/v1/ao,github.com/appoptics/appoptics-apm-go/v1/ao/internal/config,github.com/appoptics/appoptics-apm-go/v1/ao/internal/host
+  - go test -v -race -tags disable_tracing -covermode=atomic -coverprofile=covao.out -coverpkg github.com/appoptics/appoptics-apm-go/v1/ao/internal/reporter,github.com/appoptics/appoptics-apm-go/v1/ao/internal/log,github.com/appoptics/appoptics-apm-go/v1/ao,github.com/appoptics/appoptics-apm-go/v1/ao/internal/config,github.com/appoptics/appoptics-apm-go/v1/ao/internal/host
+  - pushd internal/reporter/
+  - go test -v -race -covermode=atomic -coverprofile=cov.out
+  - go test -v -race -tags disable_tracing -covermode=atomic -coverprofile=covao.out
+  - popd
+  - pushd internal/log/
+  - go test -v -race -covermode=atomic -coverprofile=cov.out
+  - go test -v -race -tags disable_tracing -covermode=atomic -coverprofile=covao.out
+  - popd
+  - pushd internal/config/
+  - go test -v -race -covermode=atomic -coverprofile=cov.out
+  - go test -v -race -tags disable_tracing -covermode=atomic -coverprofile=covao.out
+  - popd
+  - pushd internal/host/
+  - go test -v -race -covermode=atomic -coverprofile=cov.out
+  - go test -v -race -tags disable_tracing -covermode=atomic -coverprofile=covao.out
+  - popd
+  - pushd opentracing
+  - go test -v -race -covermode=atomic -coverprofile=cov.out -coverpkg github.com/appoptics/appoptics-apm-go/v1/ao/internal/reporter,github.com/appoptics/appoptics-apm-go/v1/ao/internal/log,github.com/appoptics/appoptics-apm-go/v1/ao/opentracing,github.com/appoptics/appoptics-apm-go/v1/ao,github.com/appoptics/appoptics-apm-go/v1/ao/internal/config,github.com/appoptics/appoptics-apm-go/v1/ao/internal/host
+  - go test -v -race -tags disable_tracing -covermode=atomic -coverprofile=covao.out -coverpkg github.com/appoptics/appoptics-apm-go/v1/ao/internal/reporter,github.com/appoptics/appoptics-apm-go/v1/ao/internal/log,github.com/appoptics/appoptics-apm-go/v1/ao/opentracing,github.com/appoptics/appoptics-apm-go/v1/ao,github.com/appoptics/appoptics-apm-go/v1/ao/internal/config,github.com/appoptics/appoptics-apm-go/v1/ao/internal/host
+  - popd
+  - gocovmerge cov.out covao.out internal/reporter/cov.out internal/reporter/covao.out internal/log/cov.out internal/log/covao.out internal/config/cov.out internal/config/covao.out internal/host/cov.out internal/host/covao.out opentracing/cov.out opentracing/covao.out > coverage.txt
+
+after_success:
+  - if [[ $TRAVIS_GO_VERSION == 1.9* ]]; then bash <(curl -s https://codecov.io/bash); fi

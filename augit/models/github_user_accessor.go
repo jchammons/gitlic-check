@@ -13,6 +13,8 @@ type GithubUserAccessor interface {
 	ExistsByGithubID(string) (bool, error)
 	ListGHUsers() ([]*GithubUser, error)
 	Delete(string) error
+	AddAdmin(string) error
+	RemoveAdmin(string) error
 }
 
 type GithubUserDB struct {
@@ -101,4 +103,24 @@ func (ghudb *GithubUserDB) Delete(ghID string) error {
 	}
 
 	return ghudb.tx.Destroy(foundUser)
+}
+
+func (ghudb *GithubUserDB) AddAdmin(email string) error {
+	foundUser := &GithubUser{}
+	err := ghudb.tx.Where("email = ?", email).First(foundUser)
+	if err != nil {
+		return err
+	}
+	foundUser.Admin = true
+	return ghudb.tx.Update(foundUser)
+}
+
+func (ghudb *GithubUserDB) RemoveAdmin(email string) error {
+	foundUser := &GithubUser{}
+	err := ghudb.tx.Where("email = ?", email).First(foundUser)
+	if err != nil {
+		return err
+	}
+	foundUser.Admin = false
+	return ghudb.tx.Update(foundUser)
 }

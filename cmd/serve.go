@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 
+	"github.com/appoptics/appoptics-apm-go/v1/ao"
 	"github.com/gobuffalo/pop"
 	gorillaHandlers "github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
@@ -78,11 +79,13 @@ func augitHandlers(tx *pop.Connection) *mux.Router {
 
 	r.Handle("/", http.HandlerFunc(healthCheck())).Methods("GET")
 	r.Handle("/saml/acs", sp)
-	augit.Handle("/user", sp.RequireAccount(http.HandlerFunc(handlers.ShowUser(ghudb)))).Methods("GET")
-	augit.Handle("/users", sp.RequireAccount(http.HandlerFunc(handlers.ShowAccounts(ghudb, sadb)))).Methods("GET")
-	augit.Handle("/user", sp.RequireAccount(http.HandlerFunc(handlers.AddUser(ghudb)))).Methods("POST")
-	augit.Handle("/service_account", sp.RequireAccount(http.HandlerFunc(handlers.AddServiceAccount(ghudb, sadb)))).Methods("POST")
-	augit.Handle("/check_admin", sp.RequireAccount(http.HandlerFunc(handlers.CheckAdmin(ghudb)))).Methods("GET")
+	augit.Handle("/user", sp.RequireAccount(http.HandlerFunc(ao.HTTPHandler(handlers.ShowUser(ghudb))))).Methods("GET")
+	augit.Handle("/users", sp.RequireAccount(http.HandlerFunc(ao.HTTPHandler(handlers.ShowAccounts(ghudb, sadb))))).Methods("GET")
+	augit.Handle("/user", sp.RequireAccount(http.HandlerFunc(ao.HTTPHandler(handlers.AddUser(ghudb))))).Methods("POST")
+	augit.Handle("/service_account", sp.RequireAccount(http.HandlerFunc(ao.HTTPHandler(handlers.AddServiceAccount(ghudb, sadb))))).Methods("POST")
+	augit.Handle("/check_admin", sp.RequireAccount(http.HandlerFunc(ao.HTTPHandler(handlers.CheckAdmin(ghudb))))).Methods("GET")
+	augit.Handle("/admin/{email}", sp.RequireAccount(http.HandlerFunc(ao.HTTPHandler(handlers.AddAdmin(ghudb))))).Methods("POST")
+	augit.Handle("/admin/{email}", sp.RequireAccount(http.HandlerFunc(ao.HTTPHandler(handlers.RemoveAdmin(ghudb))))).Methods("DELETE")
 	return r
 }
 
