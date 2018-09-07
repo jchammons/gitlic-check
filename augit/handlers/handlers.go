@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"github.com/solarwinds/gitlic-check/augit/email"
 	"github.com/solarwinds/gitlic-check/augit/models"
 	"github.com/solarwinds/saml/samlsp"
 )
@@ -126,11 +127,11 @@ func CheckAdmin(ghudb models.GithubUserAccessor) func(w http.ResponseWriter, r *
 	}
 }
 
-func AddServiceAccount(ghudb models.GithubUserAccessor, sadb models.ServiceAccountAccessor) func(w http.ResponseWriter, r *http.Request) {
+func AddServiceAccount(ghudb models.GithubUserAccessor, ghodb models.GithubOwnerAccessor, sadb models.ServiceAccountAccessor) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		email := getEmail(samlsp.Token(r.Context()))
-		user, err := ghudb.Find(email)
+		inEmail := getEmail(samlsp.Token(r.Context()))
+		user, err := ghudb.Find(inEmail)
 		if err != nil {
 			log.Printf("Failed to find user. Error: %v\n", err)
 			w.WriteHeader(http.StatusBadGateway)
@@ -157,20 +158,37 @@ func AddServiceAccount(ghudb models.GithubUserAccessor, sadb models.ServiceAccou
 			GithubID:         req.GithubID,
 			AdminResponsible: user.ID,
 		}
-		err = sadb.Upsert(newSA)
-		if err != nil {
-			log.Printf("Failed to create service account. Error: %v\n", err)
-			w.WriteHeader(http.StatusBadGateway)
-			w.Write([]byte(`{"error": "Could not create service account"}`))
+		exists, err := sadb.Exists(req.GithubID)
+		if !exists {
+			err = sadb.Create(newSA)
+			if err != nil {
+				log.Printf("Failed to create service account. Error: %v\n", err)
+				w.WriteHeader(http.StatusBadGateway)
+				w.Write([]byte(`{"error": "Could not create service account"}`))
+				return
+			}
+			err = ghudb.Delete(req.GithubID)
+			if err != nil && !models.IsErrRecordNotFound(err) {
+				log.Printf("Failed to delete existing GitHub account record. Error: %v\n", err)
+				w.WriteHeader(http.StatusBadGateway)
+				w.Write([]byte(`{"error": "Could not delete existing GitHub account record"}`))
+				return
+			}
+
+		} else {
+			log.Printf("Attempt to add existing service account: %s\n", req.GithubID)
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(`{"error": "Service account already registered"}`))
 			return
 		}
-		err = ghudb.Delete(req.GithubID)
+		owners, err := ghodb.List()
 		if err != nil {
-			log.Printf("Failed to delete existing GitHub account record. Error: %v\n", err)
+			log.Printf("Failed to retrieve GitHub owner records. Error: %v\n", err)
 			w.WriteHeader(http.StatusBadGateway)
-			w.Write([]byte(`{"error": "Could not delete existing GitHub account record"}`))
+			w.Write([]byte(`{"error": "Could not retrieve GitHub owner records"}`))
 			return
 		}
+		err = email.SendOwnerListEmail(user.Email, req.GithubID, owners)
 		w.WriteHeader(http.StatusNoContent)
 	}
 }

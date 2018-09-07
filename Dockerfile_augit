@@ -11,4 +11,5 @@ WORKDIR /bin/
 COPY --from=builder /bin/gitlic .
 ADD database.yml /bin/
 ADD migrations /bin/migrations
+ADD augit/email/templates /bin/templates
 CMD /bin/gitlic serve

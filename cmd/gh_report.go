@@ -24,7 +24,8 @@ var ghReportCmd = &cobra.Command{
 		}
 		ghudb := models.NewGithubUserDB(cxn)
 		ghodb := models.NewGithubOwnerDB(cxn)
-		err = persistUsers(ghudb, ghodb)
+		sadb := models.NewServiceAccountDB(cxn)
+		err = persistUsers(ghudb, ghodb, sadb)
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -42,7 +43,7 @@ type orgOwners struct {
 
 // persistUsers gets all of the users for all relevant organizations and saves them to the Augit db.
 // If they already exist in the db it is a no-op. This is intended to be run regularly.
-func persistUsers(ghudb models.GithubUserAccessor, ghodb models.GithubOwnerAccessor) error {
+func persistUsers(ghudb models.GithubUserAccessor, ghodb models.GithubOwnerAccessor, sadb models.ServiceAccountAccessor) error {
 	ctx := context.Background()
 	cf := config.GetConfig()
 	ghClient := github.NewClient(oauth2.NewClient(ctx, oauth2.StaticTokenSource(&oauth2.Token{AccessToken: cf.Github.Token})))
@@ -76,6 +77,13 @@ func persistUsers(ghudb models.GithubUserAccessor, ghodb models.GithubOwnerAcces
 		}
 		exists, err := ghudb.ExistsByGithubID(*member.Login)
 		if exists {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		saExists, err := sadb.Exists(*member.Login)
+		if saExists {
 			continue
 		}
 		if err != nil {

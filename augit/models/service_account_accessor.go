@@ -3,7 +3,8 @@ package models
 import "github.com/gobuffalo/pop"
 
 type ServiceAccountAccessor interface {
-	Upsert(*ServiceAccount) error
+	Create(*ServiceAccount) error
+	Exists(string) (bool, error)
 	FindByGithubID(string) (*ServiceAccount, error)
 	List() ([]*ServiceAccount, error)
 }
@@ -16,16 +17,8 @@ func NewServiceAccountDB(cxn *pop.Connection) *ServiceAccountDB {
 	return &ServiceAccountDB{cxn}
 }
 
-func (sadb *ServiceAccountDB) Upsert(acct *ServiceAccount) error {
-	serviceAcct := &ServiceAccount{}
-	// I could not get Pop to let me update a record without first retrieving it, I assume
-	// because it requires the primary key.
-	err := sadb.tx.Where("github_id = ?", acct.GithubID).First(serviceAcct)
-	if err != nil {
-		return err
-	}
-	serviceAcct.AdminResponsible = acct.AdminResponsible
-	vErrs, err := sadb.tx.ValidateAndUpdate(serviceAcct)
+func (sadb *ServiceAccountDB) Create(acct *ServiceAccount) error {
+	vErrs, err := sadb.tx.ValidateAndCreate(acct)
 	if vErrs.HasAny() {
 		return vErrs
 	} else if err != nil {
@@ -42,4 +35,8 @@ func (sadb *ServiceAccountDB) FindByGithubID(ghID string) (*ServiceAccount, erro
 func (sadb *ServiceAccountDB) List() ([]*ServiceAccount, error) {
 	accts := []*ServiceAccount{}
 	return accts, sadb.tx.All(&accts)
+}
+
+func (sadb *ServiceAccountDB) Exists(ghID string) (bool, error) {
+	return sadb.tx.Where("github_id = ?", ghID).Exists(&ServiceAccount{})
 }
