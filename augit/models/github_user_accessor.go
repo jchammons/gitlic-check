@@ -3,6 +3,7 @@ package models
 import (
 	"errors"
 	"github.com/gobuffalo/pop"
+	"github.com/gobuffalo/uuid"
 )
 
 type GithubUserAccessor interface {
@@ -10,6 +11,7 @@ type GithubUserAccessor interface {
 	Upsert(*GithubUser) error
 	ReplaceGHRow(*GithubUser) error
 	Find(string) (*GithubUser, error)
+	FindByID(uuid.UUID) (*GithubUser, error)
 	ExistsByGithubID(string) (bool, error)
 	ListGHUsers() ([]*GithubUser, error)
 	Delete(string) error
@@ -80,6 +82,11 @@ func (ghudb *GithubUserDB) ReplaceGHRow(inUser *GithubUser) error {
 func (ghudb *GithubUserDB) Find(email string) (*GithubUser, error) {
 	foundUser := &GithubUser{}
 	return foundUser, ghudb.tx.Where("email = ?", email).First(foundUser)
+}
+
+func (ghudb *GithubUserDB) FindByID(id uuid.UUID) (*GithubUser, error) {
+	foundUser := &GithubUser{}
+	return foundUser, ghudb.tx.Where("id = ?", id).First(foundUser)
 }
 
 //

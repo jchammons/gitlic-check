@@ -11,9 +11,14 @@ import (
 	"github.com/solarwinds/saml/samlsp"
 )
 
+type serviceAcctResponse struct {
+	GithubID         string `json:"github_id"`
+	AdminResponsible string `json:"admin_responsible"`
+}
+
 type ShowAccountsResponse struct {
-	Users           []*models.GithubUser     `json:"users"`
-	ServiceAccounts []*models.ServiceAccount `json:"service_accounts"`
+	Users           []*models.GithubUser   `json:"users"`
+	ServiceAccounts []*serviceAcctResponse `json:"service_accounts"`
 }
 
 func getEmail(token *samlsp.AuthorizationToken) string {
@@ -59,9 +64,20 @@ func ShowAccounts(ghudb models.GithubUserAccessor, sadb models.ServiceAccountAcc
 			w.Write([]byte(`{"error": "Could not find service accounts"}`))
 			return
 		}
+		svcAcctResponses := []*serviceAcctResponse{}
+		for _, svcAcct := range serviceAccounts {
+			admin, err := ghudb.FindByID(svcAcct.AdminResponsible)
+			if err != nil {
+				continue
+			}
+			svcAcctResponses = append(svcAcctResponses, &serviceAcctResponse{
+				GithubID:         svcAcct.GithubID,
+				AdminResponsible: admin.Email,
+			})
+		}
 		allAccounts := ShowAccountsResponse{
 			Users:           users,
-			ServiceAccounts: serviceAccounts,
+			ServiceAccounts: svcAcctResponses,
 		}
 		marshaledAccounts, err := json.Marshal(allAccounts)
 		if err != nil {
