@@ -1,0 +1,5 @@
+create_table("github_owners", func(t) {
+	t.Column("id", "uuid", {"primary": true})
+	t.Column("github_id", "string", {})
+	t.Column("org", "string", {})
+})
