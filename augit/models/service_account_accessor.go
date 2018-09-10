@@ -29,7 +29,7 @@ func (sadb *ServiceAccountDB) Create(acct *ServiceAccount) error {
 
 func (sadb *ServiceAccountDB) FindByGithubID(ghID string) (*ServiceAccount, error) {
 	foundAcct := &ServiceAccount{}
-	return foundAcct, sadb.tx.Where("github_id = ?", ghID).First(foundAcct)
+	return foundAcct, sadb.tx.Where("LOWER(github_id) = LOWER(?)", ghID).First(foundAcct)
 }
 
 func (sadb *ServiceAccountDB) List() ([]*ServiceAccount, error) {
@@ -38,5 +38,5 @@ func (sadb *ServiceAccountDB) List() ([]*ServiceAccount, error) {
 }
 
 func (sadb *ServiceAccountDB) Exists(ghID string) (bool, error) {
-	return sadb.tx.Where("github_id = ?", ghID).Exists(&ServiceAccount{})
+	return sadb.tx.Where("LOWER(github_id) = LOWER(?)", ghID).Exists(&ServiceAccount{})
 }

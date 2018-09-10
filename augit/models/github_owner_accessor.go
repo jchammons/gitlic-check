@@ -23,7 +23,7 @@ func (ghodb *GithubOwnerDB) Create(inUser *GithubOwner) error {
 }
 
 func (ghodb *GithubOwnerDB) ExistsByGithubIDInOrg(ghID, org string) (bool, error) {
-	return ghodb.tx.Where("github_id = ? AND org = ?", ghID, org).Exists(&GithubOwner{})
+	return ghodb.tx.Where("LOWER(github_id) = LOWER(?) AND LOWER(org) = LOWER(?)", ghID, org).Exists(&GithubOwner{})
 }
 
 func (ghodb *GithubOwnerDB) List() ([]*GithubOwner, error) {

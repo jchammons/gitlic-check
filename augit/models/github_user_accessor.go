@@ -8,7 +8,6 @@ import (
 
 type GithubUserAccessor interface {
 	Create(*GithubUser) error
-	Upsert(*GithubUser) error
 	ReplaceGHRow(*GithubUser) error
 	Find(string) (*GithubUser, error)
 	FindByID(uuid.UUID) (*GithubUser, error)
@@ -28,39 +27,19 @@ func NewGithubUserDB(tx *pop.Connection) *GithubUserDB {
 	return &GithubUserDB{tx}
 }
 
-func (ghudb *GithubUserDB) Upsert(user *GithubUser) error {
-	ghUser := &GithubUser{}
-	// I could not get Pop to let me update a record without first retrieving it, I assume
-	// because it requires the primary key.
-	err := ghudb.tx.Where("email = ? OR github_id = ?", user.Email, user.GithubID).First(ghUser)
-	if err != nil {
-		return err
-	}
-	if user.GithubID != "" {
-		ghUser.GithubID = user.GithubID
-	}
-	vErrs, err := ghudb.tx.ValidateAndUpdate(ghUser)
-	if vErrs.HasAny() {
-		return vErrs
-	} else if err != nil {
-		return err
-	}
-	return nil
-}
-
 func (ghudb *GithubUserDB) ReplaceGHRow(inUser *GithubUser) error {
 	return ghudb.tx.Transaction(func(tx *pop.Connection) error {
 		if inUser.GithubID == "" {
 			return errors.New("must provide a GitHub ID")
 		}
 		existingGHRow := &GithubUser{}
-		err := ghudb.tx.Where("github_id = ?", inUser.GithubID).First(existingGHRow)
+		err := ghudb.tx.Where("LOWER(github_id) = LOWER(?)", inUser.GithubID).First(existingGHRow)
 		if err != nil {
 			return err
 		}
 
 		existingUser := &GithubUser{}
-		err = tx.Where("email = ?", inUser.Email).First(existingUser)
+		err = tx.Where("LOWER(email) = LOWER(?)", inUser.Email).First(existingUser)
 		if err != nil {
 			return err
 		}
@@ -81,7 +60,7 @@ func (ghudb *GithubUserDB) ReplaceGHRow(inUser *GithubUser) error {
 // Find returns the user with the given email
 func (ghudb *GithubUserDB) Find(email string) (*GithubUser, error) {
 	foundUser := &GithubUser{}
-	return foundUser, ghudb.tx.Where("email = ?", email).First(foundUser)
+	return foundUser, ghudb.tx.Where("LOWER(email) = LOWER(?)", email).First(foundUser)
 }
 
 func (ghudb *GithubUserDB) FindByID(id uuid.UUID) (*GithubUser, error) {
@@ -91,7 +70,7 @@ func (ghudb *GithubUserDB) FindByID(id uuid.UUID) (*GithubUser, error) {
 
 //
 func (ghudb *GithubUserDB) ExistsByGithubID(ghID string) (bool, error) {
-	return ghudb.tx.Where("github_id = ?", ghID).Exists(&GithubUser{})
+	return ghudb.tx.Where("LOWER(github_id) = LOWER(?)", ghID).Exists(&GithubUser{})
 }
 
 func (ghudb *GithubUserDB) Create(inUser *GithubUser) error {
@@ -105,7 +84,7 @@ func (ghudb *GithubUserDB) ListGHUsers() ([]*GithubUser, error) {
 
 func (ghudb *GithubUserDB) Delete(ghID string) error {
 	foundUser := &GithubUser{}
-	err := ghudb.tx.Where("github_id = ?", ghID).First(foundUser)
+	err := ghudb.tx.Where("LOWER(github_id) = LOWER(?)", ghID).First(foundUser)
 	if err != nil {
 		return err
 	}
@@ -115,7 +94,7 @@ func (ghudb *GithubUserDB) Delete(ghID string) error {
 
 func (ghudb *GithubUserDB) AddAdmin(email string) error {
 	foundUser := &GithubUser{}
-	err := ghudb.tx.Where("email = ?", email).First(foundUser)
+	err := ghudb.tx.Where("LOWER(email) = LOWER(?)", email).First(foundUser)
 	if err != nil {
 		return err
 	}
@@ -125,7 +104,7 @@ func (ghudb *GithubUserDB) AddAdmin(email string) error {
 
 func (ghudb *GithubUserDB) RemoveAdmin(email string) error {
 	foundUser := &GithubUser{}
-	err := ghudb.tx.Where("email = ?", email).First(foundUser)
+	err := ghudb.tx.Where("LOWER(email) = LOWER(?)", email).First(foundUser)
 	if err != nil {
 		return err
 	}
@@ -135,7 +114,7 @@ func (ghudb *GithubUserDB) RemoveAdmin(email string) error {
 
 func (ghudb *GithubUserDB) MakeOwner(ghID string) error {
 	foundUser := &GithubUser{}
-	err := ghudb.tx.Where("github_id = ?", ghID).First(foundUser)
+	err := ghudb.tx.Where("LOWER(github_id) = LOWER(?)", ghID).First(foundUser)
 	if err != nil {
 		return err
 	}
