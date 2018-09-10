@@ -11,6 +11,7 @@ import (
 	"github.com/solarwinds/gitlic-check/augit/models"
 	swio "github.com/solarwinds/swio-users"
 	"github.com/spf13/cobra"
+	"strings"
 )
 
 // populateCmd represents the populate command
@@ -42,7 +43,7 @@ func (adb *AugitDB) Create(inUser *swio.User) error {
 	}
 	ghUser := &models.GithubUser{
 		Name:  fmt.Sprintf("%s %s", inUser.FirstName, inUser.LastName),
-		Email: inUser.Email,
+		Email: strings.ToLower(inUser.Email),
 	}
 	if !adb.exists(inUser) {
 		vErrs, err := adb.db.ValidateAndCreate(ghUser)
@@ -58,7 +59,7 @@ func (adb *AugitDB) Create(inUser *swio.User) error {
 
 func (adb *AugitDB) checkForDeletion(inUser *swio.User) error {
 	queryUser := &models.GithubUser{}
-	err := adb.db.Where("email = ?", inUser.Email).First(queryUser)
+	err := adb.db.Where("email = ?", strings.ToLower(inUser.Email)).First(queryUser)
 	if err != nil {
 		if models.IsErrRecordNotFound(err) {
 			return nil
@@ -71,7 +72,7 @@ func (adb *AugitDB) checkForDeletion(inUser *swio.User) error {
 
 func (adb *AugitDB) exists(inUser *swio.User) bool {
 	ghUser := &models.GithubUser{}
-	exists, err := adb.db.Where("email = ?", inUser.Email).Exists(ghUser)
+	exists, err := adb.db.Where("email = ?", strings.ToLower(inUser.Email)).Exists(ghUser)
 	if err != nil {
 		fmt.Printf("error checking if user %s exists: %s\n", inUser.Email, err.Error())
 		return false
