@@ -32,8 +32,15 @@ func (ghudb *GithubUserDB) ReplaceGHRow(inUser *GithubUser) error {
 		if inUser.GithubID == "" {
 			return errors.New("must provide a GitHub ID")
 		}
+		alreadyExists, err := ghudb.tx.Where("LOWER(github_id) = LOWER(?) AND LOWER(email) = LOWER(?)", inUser.GithubID, inUser.Email).Exists(&GithubUser{})
+		if err != nil {
+			return err
+		}
+		if alreadyExists {
+			return nil
+		}
 		existingGHRow := &GithubUser{}
-		err := ghudb.tx.Where("LOWER(github_id) = LOWER(?)", inUser.GithubID).First(existingGHRow)
+		err = ghudb.tx.Where("LOWER(github_id) = LOWER(?)", inUser.GithubID).First(existingGHRow)
 		if err != nil {
 			return err
 		}
