@@ -154,13 +154,6 @@ func AddServiceAccount(ghudb models.GithubUserAccessor, ghodb models.GithubOwner
 			w.Write([]byte(`{"error": "Could not find user"}`))
 			return
 		}
-		if !user.Admin {
-			log.Printf("Non-admin attempted to add service account: %s", user.Email)
-			w.WriteHeader(http.StatusForbidden)
-			w.Write([]byte(`{"error": "Must be admin to add service account"}`))
-			return
-		}
-
 		var req addGHRequest
 		err = json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
