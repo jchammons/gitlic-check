@@ -90,7 +90,7 @@ func PopulateDomainUsers() error {
 		return errors.New("must provide id and secret")
 	}
 	augitDb := &AugitDB{cxn}
-	populator := swio.NewPopulator(id, secret)
+	populator := swio.NewPopulator(id, secret, []string{})
 	for populator.MoreUsers() {
 		users, err := populator.GetUsers()
 		if err != nil {

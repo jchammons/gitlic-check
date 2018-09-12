@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	swio "github.com/solarwinds/swio-users"
 	"log"
 	"os"
@@ -40,10 +41,19 @@ func PopulateDomainUsers() error {
 	if id == "" || secret == "" {
 		return errors.New("must provide id and secret")
 	}
+	db := &SampleUserDB{}
 	populator := swio.NewPopulator(id, secret)
-	err := populator.Populate(&SampleUserDB{})
-	if err != nil {
-		return err
+	for populator.MoreGroups() {
+		users, err := populator.GetUsersByGroup()
+		if err != nil {
+			log.Fatalln(err)
+		}
+		for _, user := range users {
+			err := db.Create(user)
+			if err != nil {
+				fmt.Printf("err: %+v\n", err)
+			}
+		}
 	}
 }
 

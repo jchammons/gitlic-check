@@ -11,6 +11,11 @@ import (
 	"strings"
 )
 
+var (
+	USER_TYPE  = "#microsoft.graph.user"
+	GROUP_TYPE = "#microsoft.graph.group"
+)
+
 type User struct {
 	FirstName string
 	LastName  string
@@ -26,36 +31,53 @@ type MSTokenResponse struct {
 	AccessType  string `json:"access_type"`
 }
 
-type AzureADResponse struct {
-	Value    []ADUser `json:"value"`
-	NextLink string   `json:"odata.nextLink"`
+type ADResponse struct {
+	Value    []ADObject `json:"value"`
+	NextLink string     `json:"@odata.nextLink"`
 }
 
-type ADUser struct {
-	Mail      string `json:"mail"`
-	GivenName string `json:"givenName"`
-	Surname   string `json:"surname"`
-	Enabled   bool   `json:"accountEnabled"`
+type ADObject struct {
+	DisplayName string `json:"displayName"`
+	Enabled     bool   `json:"accountEnabled"`
+	GivenName   string `json:"givenName"`
+	Mail        string `json:"mail"`
+	ObjectID    string `json:"id"`
+	ObjectType  string `json:"@odata.type"`
+	Surname     string `json:"surname"`
 }
 
 type Populator struct {
-	clientID     string
-	clientSecret string
-	more         bool
-	token        *MSTokenResponse
-	nextLink     string
+	clientID        string
+	clientSecret    string
+	engineeringOnly bool
+	groupIDs        []string
+	more            bool
+	moreDisabled    bool
+	nextLink        string
+	token           *MSTokenResponse
+	userCount       int
 }
 
-func NewPopulator(clientID, clientSecret string) *Populator {
+func NewPopulator(clientID, clientSecret string, topLevelGroups []string) *Populator {
 	return &Populator{
 		clientID:     clientID,
 		clientSecret: clientSecret,
+		groupIDs:     topLevelGroups,
 		more:         true,
+		moreDisabled: true,
 	}
 }
 
 func (p *Populator) MoreUsers() bool {
 	return p.more
+}
+
+func (p *Populator) MoreDisabled() bool {
+	return p.moreDisabled
+}
+
+func (p *Populator) MoreGroups() bool {
+	return len(p.groupIDs) > 0
 }
 
 func (p *Populator) GetUsers() ([]*User, error) {
@@ -91,18 +113,116 @@ func (p *Populator) GetUsers() ([]*User, error) {
 	return users, nil
 }
 
-func (p *Populator) requestUsers(token *MSTokenResponse, skipToken string) (*AzureADResponse, error) {
+func (p *Populator) GetDisabledUsers() ([]*User, error) {
+	token := p.getToken()
 	client := &http.Client{}
-	req, _ := http.NewRequest("GET", "https://graph.windows.net/solarwinds.com/users?api-version=1.6&$top=999", nil)
+	req, _ := http.NewRequest("GET", "https://graph.microsoft.com/v1.0/users?$filter=accountEnabled%20eq%20false", nil)
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
-	req.Header.Add("Accept", "application/json, text/plain, */*")
-	req.Header.Add("Accept-Encoding", "gzip, deflate, br")
-	req.Header.Add("Accept-Language", "en-US,en;q=0.9")
+	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Referer", "https://graphexplorer.azurewebsites.net/")
+
+	fmt.Println("Requesting with ", req.URL.String())
+	usersResp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := ioutil.ReadAll(usersResp.Body)
+	if err != nil {
+		return nil, err
+	}
+	adResp := &ADResponse{}
+	err = json.Unmarshal(body, adResp)
+	if err != nil {
+		return nil, err
+	}
+
+	users := []*User{}
+	for _, val := range adResp.Value {
+		users = append(users, &User{
+			FirstName: val.GivenName,
+			LastName:  val.Surname,
+			Email:     val.Mail,
+			Enabled:   val.Enabled,
+		})
+	}
+	nextLinkReg := regexp.MustCompile("skiptoken=(.*)")
+	matches := nextLinkReg.FindStringSubmatch(adResp.NextLink)
+	if len(matches) == 2 {
+		p.nextLink = matches[1]
+	} else {
+		p.nextLink = ""
+	}
+	if adResp.NextLink == "" {
+		p.moreDisabled = false
+	}
+	return users, nil
+}
+
+func (p *Populator) GetUsersByGroup() ([]*User, error) {
+	toke := p.getToken()
+	if len(p.groupIDs) > 0 {
+		id := p.groupIDs[0]
+		p.groupIDs = p.groupIDs[1:]
+		users, newGroups, err := p.getGroupMembers(toke, id)
+		if err != nil {
+			return nil, err
+		}
+		p.groupIDs = append(p.groupIDs, newGroups...)
+		return users, nil
+	}
+	return []*User{}, nil
+}
+
+func (p *Populator) getGroupMembers(token *MSTokenResponse, groupId string) ([]*User, []string, error) {
+	newGroups := []string{}
+	users := []*User{}
+	client := &http.Client{}
+	req, _ := http.NewRequest("GET", fmt.Sprintf("https://graph.microsoft.com/v1.0/groups/%s/members?$top=999&$select=displayName,accountEnabled,givenName,mail,objectId,objectType,surname", groupId), nil)
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
+	req.Header.Add("Content-Type", "application/json")
+
+	groupResp, err := client.Do(req)
+	if err != nil {
+		return nil, newGroups, err
+	}
+	body, err := ioutil.ReadAll(groupResp.Body)
+	if err != nil {
+		return nil, newGroups, err
+	}
+
+	adResp := &ADResponse{}
+	err = json.Unmarshal(body, adResp)
+	if err != nil {
+		return nil, newGroups, err
+	}
+	for _, val := range adResp.Value {
+		if val.ObjectType == GROUP_TYPE {
+			newGroups = append(newGroups, val.ObjectID)
+		} else if val.ObjectType == USER_TYPE {
+			if val.Enabled {
+				users = append(users, &User{
+					FirstName: val.GivenName,
+					LastName:  val.Surname,
+					Email:     val.Mail,
+					Enabled:   true,
+				})
+			}
+		}
+	}
+	return users, newGroups, nil
+}
+
+func (p *Populator) requestUsers(token *MSTokenResponse, skipToken string) (*ADResponse, error) {
+	client := &http.Client{}
+	req, _ := http.NewRequest("GET", "https://graph.microsoft.com/v1.0/users?$top=999", nil)
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
+	req.Header.Add("Content-Type", "application/json")
 
 	if skipToken != "" {
 		q := req.URL.Query()
-		q.Add("$skiptoken", skipToken)
+		decodedToken, _ := url.QueryUnescape(skipToken)
+		q.Add("$skiptoken", decodedToken)
 		req.URL.RawQuery = q.Encode()
 	}
 
@@ -115,7 +235,8 @@ func (p *Populator) requestUsers(token *MSTokenResponse, skipToken string) (*Azu
 	if err != nil {
 		return nil, err
 	}
-	adResp := &AzureADResponse{}
+
+	adResp := &ADResponse{}
 	err = json.Unmarshal(body, adResp)
 	if err != nil {
 		return nil, err
@@ -131,7 +252,7 @@ func (p *Populator) getToken() *MSTokenResponse {
 	data.Set("client_id", p.clientID)
 	data.Set("client_secret", p.clientSecret)
 	data.Set("grant_type", "client_credentials")
-	data.Set("resource", "https://graph.windows.net")
+	data.Set("resource", "https://graph.microsoft.com")
 	resp, err := http.Post("https://login.microsoftonline.com/solarwinds.com/oauth2/token", "application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
 	if err != nil {
 		log.Fatal(err)
