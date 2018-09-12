@@ -256,8 +256,8 @@
 [[projects]]
   name = "github.com/solarwinds/swio-users"
   packages = ["."]
-  revision = "3309e4c554d165118ec35b6f02da62627aacacc5"
-  version = "0.5.2"
+  revision = "7fb6f0a85c0ccb7663b5f67bd9bde1fe4922cfb6"
+  version = "0.5.3"
 
 [[projects]]
   name = "github.com/spf13/cobra"
@@ -423,6 +423,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "5dc4e417af727186dcf36c81b23d0ca669c2372a4eea3775d30fb6f79346316a"
+  inputs-digest = "fe09fe15e0cd290c341a9b54c88823bda29db31ed4bde56fcf43d10b3772ed99"
   solver-name = "gps-cdcl"
   solver-version = 1

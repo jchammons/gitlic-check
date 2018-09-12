@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strings"
 )
 
@@ -37,25 +36,26 @@ type ADResponse struct {
 }
 
 type ADObject struct {
-	DisplayName string `json:"displayName"`
-	Enabled     bool   `json:"accountEnabled"`
-	GivenName   string `json:"givenName"`
-	Mail        string `json:"mail"`
-	ObjectID    string `json:"id"`
-	ObjectType  string `json:"@odata.type"`
-	Surname     string `json:"surname"`
+	DisplayName       string `json:"displayName"`
+	Enabled           bool   `json:"accountEnabled"`
+	GivenName         string `json:"givenName"`
+	UserPrincipalName string `json:"userPrincipalName"`
+	ObjectID          string `json:"id"`
+	ObjectType        string `json:"@odata.type"`
+	Surname           string `json:"surname"`
 }
 
 type Populator struct {
-	clientID        string
-	clientSecret    string
-	engineeringOnly bool
-	groupIDs        []string
-	more            bool
-	moreDisabled    bool
-	nextLink        string
-	token           *MSTokenResponse
-	userCount       int
+	clientID         string
+	clientSecret     string
+	engineeringOnly  bool
+	groupIDs         []string
+	more             bool
+	moreDisabled     bool
+	nextLink         string
+	nextDisabledLink string
+	token            *MSTokenResponse
+	userCount        int
 }
 
 func NewPopulator(clientID, clientSecret string, topLevelGroups []string) *Populator {
@@ -82,31 +82,25 @@ func (p *Populator) MoreGroups() bool {
 
 func (p *Populator) GetUsers() ([]*User, error) {
 	toke := p.getToken()
-	adResp, err := p.requestUsers(toke, p.nextLink)
+	adResp, err := p.requestUsers(toke)
 	if err != nil {
 		return nil, err
 	}
 	users := []*User{}
 	for _, user := range adResp.Value {
-		if user.Mail == "" {
+		if user.UserPrincipalName == "" {
 			fmt.Printf("[NO EMAIL] skipping user: %+v\n", user)
 			continue
 		}
 		users = append(users, &User{
 			FirstName: user.GivenName,
 			LastName:  user.Surname,
-			Email:     user.Mail,
+			Email:     user.UserPrincipalName,
 			Enabled:   user.Enabled,
 		})
 	}
 
-	nextLinkReg := regexp.MustCompile("skiptoken=(.*)")
-	matches := nextLinkReg.FindStringSubmatch(adResp.NextLink)
-	if len(matches) == 2 {
-		p.nextLink = matches[1]
-	} else {
-		p.nextLink = ""
-	}
+	p.nextLink = adResp.NextLink
 	if adResp.NextLink == "" {
 		p.more = false
 	}
@@ -116,7 +110,13 @@ func (p *Populator) GetUsers() ([]*User, error) {
 func (p *Populator) GetDisabledUsers() ([]*User, error) {
 	token := p.getToken()
 	client := &http.Client{}
-	req, _ := http.NewRequest("GET", "https://graph.microsoft.com/v1.0/users?$filter=accountEnabled%20eq%20false", nil)
+	var url string
+	if p.nextDisabledLink != "" {
+		url = p.nextDisabledLink
+	} else {
+		url = "https://graph.microsoft.com/v1.0/users?$filter=accountEnabled%20eq%20false"
+	}
+	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Referer", "https://graphexplorer.azurewebsites.net/")
@@ -142,17 +142,11 @@ func (p *Populator) GetDisabledUsers() ([]*User, error) {
 		users = append(users, &User{
 			FirstName: val.GivenName,
 			LastName:  val.Surname,
-			Email:     val.Mail,
+			Email:     val.UserPrincipalName,
 			Enabled:   val.Enabled,
 		})
 	}
-	nextLinkReg := regexp.MustCompile("skiptoken=(.*)")
-	matches := nextLinkReg.FindStringSubmatch(adResp.NextLink)
-	if len(matches) == 2 {
-		p.nextLink = matches[1]
-	} else {
-		p.nextLink = ""
-	}
+	p.nextDisabledLink = adResp.NextLink
 	if adResp.NextLink == "" {
 		p.moreDisabled = false
 	}
@@ -178,7 +172,7 @@ func (p *Populator) getGroupMembers(token *MSTokenResponse, groupId string) ([]*
 	newGroups := []string{}
 	users := []*User{}
 	client := &http.Client{}
-	req, _ := http.NewRequest("GET", fmt.Sprintf("https://graph.microsoft.com/v1.0/groups/%s/members?$top=999&$select=displayName,accountEnabled,givenName,mail,objectId,objectType,surname", groupId), nil)
+	req, _ := http.NewRequest("GET", fmt.Sprintf("https://graph.microsoft.com/v1.0/groups/%s/members?$top=999&$select=displayName,accountEnabled,givenName,mail,objectId,objectType,surname,userPrincipalName", groupId), nil)
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
 	req.Header.Add("Content-Type", "application/json")
 
@@ -204,7 +198,7 @@ func (p *Populator) getGroupMembers(token *MSTokenResponse, groupId string) ([]*
 				users = append(users, &User{
 					FirstName: val.GivenName,
 					LastName:  val.Surname,
-					Email:     val.Mail,
+					Email:     val.UserPrincipalName,
 					Enabled:   true,
 				})
 			}
@@ -213,18 +207,17 @@ func (p *Populator) getGroupMembers(token *MSTokenResponse, groupId string) ([]*
 	return users, newGroups, nil
 }
 
-func (p *Populator) requestUsers(token *MSTokenResponse, skipToken string) (*ADResponse, error) {
+func (p *Populator) requestUsers(token *MSTokenResponse) (*ADResponse, error) {
+	var url string
 	client := &http.Client{}
-	req, _ := http.NewRequest("GET", "https://graph.microsoft.com/v1.0/users?$top=999", nil)
+	if p.nextLink != "" {
+		url = p.nextLink
+	} else {
+		url = "https://graph.microsoft.com/v1.0/users?$top=999&$select=displayName,accountEnabled,givenName,mail,objectId,objectType,surname,userPrincipalName"
+	}
+	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
 	req.Header.Add("Content-Type", "application/json")
-
-	if skipToken != "" {
-		q := req.URL.Query()
-		decodedToken, _ := url.QueryUnescape(skipToken)
-		q.Add("$skiptoken", decodedToken)
-		req.URL.RawQuery = q.Encode()
-	}
 
 	fmt.Println("Requesting with ", req.URL.String())
 	usersResp, err := client.Do(req)
