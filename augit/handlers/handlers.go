@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -21,6 +22,17 @@ type ShowAccountsResponse struct {
 	ServiceAccounts []*serviceAcctResponse `json:"service_accounts"`
 }
 
+// getCanonicalEmail accesses the UserName attribute on the SAML token, which thanks to
+// our Okta integration is sourced from the Active Directory userPrincipalName field.
+// This is the canonical email that we use to relate users in our system back to their
+// Active Directory entries
+func getCanonicalEmail(token *samlsp.AuthorizationToken) string {
+	return token.Attributes.Get("UserName")
+}
+
+// getEmail accesses the Subject on the SAML token which should be the user's primary email
+// in Okta. We want to use this for actually sending emails, but not for associating a user
+// in our system with their Active Directory entry.
 func getEmail(token *samlsp.AuthorizationToken) string {
 	return token.Subject
 }
@@ -28,7 +40,7 @@ func getEmail(token *samlsp.AuthorizationToken) string {
 func ShowUser(ghudb models.GithubUserAccessor) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		email := getEmail(samlsp.Token(r.Context()))
+		email := getCanonicalEmail(samlsp.Token(r.Context()))
 		user, err := ghudb.Find(email)
 		if err != nil {
 			log.Printf("Failed to find user with email %s. Error: %v\n", email, err)
@@ -107,14 +119,14 @@ func AddUser(ghudb models.GithubUserAccessor) func(w http.ResponseWriter, r *htt
 		}
 
 		updateUser := &models.GithubUser{
-			Email:    getEmail(samlsp.Token(r.Context())),
+			Email:    getCanonicalEmail(samlsp.Token(r.Context())),
 			GithubID: req.GithubID,
 		}
 		err = ghudb.ReplaceGHRow(updateUser)
 		if err != nil {
 			log.Printf("Failed to create user. Error: %v\n", err)
 			w.WriteHeader(http.StatusBadGateway)
-			w.Write([]byte(`{"error": "Could not create user"}`))
+			w.Write([]byte(fmt.Sprintf(`{"error": "Could not create user: %s"}`, err.Error())))
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -123,7 +135,7 @@ func AddUser(ghudb models.GithubUserAccessor) func(w http.ResponseWriter, r *htt
 
 func CheckAdmin(ghudb models.GithubUserAccessor) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		email := getEmail(samlsp.Token(r.Context()))
+		email := getCanonicalEmail(samlsp.Token(r.Context()))
 		user, err := ghudb.Find(email)
 		if err != nil {
 			w.Header().Set("Content-Type", "application/json")
@@ -146,7 +158,7 @@ func CheckAdmin(ghudb models.GithubUserAccessor) func(w http.ResponseWriter, r *
 func AddServiceAccount(ghudb models.GithubUserAccessor, ghodb models.GithubOwnerAccessor, sadb models.ServiceAccountAccessor) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		inEmail := getEmail(samlsp.Token(r.Context()))
+		inEmail := getCanonicalEmail(samlsp.Token(r.Context()))
 		user, err := ghudb.Find(inEmail)
 		if err != nil {
 			log.Printf("Failed to find user. Error: %v\n", err)
@@ -197,7 +209,7 @@ func AddServiceAccount(ghudb models.GithubUserAccessor, ghodb models.GithubOwner
 			w.Write([]byte(`{"error": "Could not retrieve GitHub owner records"}`))
 			return
 		}
-		err = email.SendOwnerListEmail(user.Email, req.GithubID, owners)
+		err = email.SendOwnerListEmail(getEmail(samlsp.Token(r.Context())), req.GithubID, owners)
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
@@ -205,7 +217,7 @@ func AddServiceAccount(ghudb models.GithubUserAccessor, ghodb models.GithubOwner
 func AddAdmin(ghudb models.GithubUserAccessor) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
-		email := getEmail(samlsp.Token(r.Context()))
+		email := getCanonicalEmail(samlsp.Token(r.Context()))
 		user, err := ghudb.Find(email)
 		if err != nil {
 			log.Printf("Failed to find user. Error: %v\n", err)
@@ -245,7 +257,7 @@ func AddAdmin(ghudb models.GithubUserAccessor) func(w http.ResponseWriter, r *ht
 func RemoveAdmin(ghudb models.GithubUserAccessor) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
-		email := getEmail(samlsp.Token(r.Context()))
+		email := getCanonicalEmail(samlsp.Token(r.Context()))
 		user, err := ghudb.Find(email)
 		if err != nil {
 			log.Printf("Failed to find user. Error: %v\n", err)

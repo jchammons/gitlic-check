@@ -2,6 +2,8 @@ package models
 
 import (
 	"errors"
+	"log"
+
 	"github.com/gobuffalo/pop"
 	"github.com/gobuffalo/uuid"
 )
@@ -42,7 +44,8 @@ func (ghudb *GithubUserDB) ReplaceGHRow(inUser *GithubUser) error {
 		existingGHRow := &GithubUser{}
 		err = ghudb.tx.Where("LOWER(github_id) = LOWER(?)", inUser.GithubID).First(existingGHRow)
 		if err != nil {
-			return err
+			log.Printf("Error finding existing GitHub user: %s\n", err.Error())
+			return errors.New("Could not find that GitHub user in SolarWinds organizations")
 		}
 
 		existingUser := &GithubUser{}
