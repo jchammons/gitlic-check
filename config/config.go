@@ -24,7 +24,7 @@ type DriveConfig struct {
 }
 
 func GetConfig() Config {
-	fh, err := ioutil.ReadFile("config/config.json")
+	fh, err := ioutil.ReadFile("config/options.json")
 	if err != nil {
 		log.Fatalf("Failed to read config file. Error: %s\n", err)
 	}
@@ -32,7 +32,7 @@ func GetConfig() Config {
 	if err := json.Unmarshal(fh, &cf); err != nil {
 		log.Fatalf("Failed to parse config file. Error: %v\n", err)
 	}
-	// Ensure GitHub credentials have been included in config file
+	// Ensure GitHub credentials have been included in options file
 	if cf.Github == nil || cf.Github.Token == "" {
 		log.Fatalf("Failed to parse PAT for GitHub. Please ensure you're following instructions in README.")
 	}
