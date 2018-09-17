@@ -82,7 +82,7 @@ func run() {
 
 	}
 
-	if uploadOnly == false && cf.Drive != nil {
+	if noUpload == false && cf.Drive != nil {
 		gitlic.UploadToDrive(ctx, cf, wd, fo)
 	}
 }
