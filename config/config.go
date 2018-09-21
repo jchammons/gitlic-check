@@ -13,7 +13,7 @@ type Config struct {
 
 type GhConfig struct {
 	Token          string   `json:"pat"`
-	IgnoredOrgs    []string `json:"ignoredOrgs,omitempty"`
+	IncludedOrgs   []string `json:"includedOrgs,omitempty"`
 	RmInvitesAfter int      `json:"rmInvitesAfter,omitempty"` // in hours
 }
 

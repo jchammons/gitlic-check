@@ -50,11 +50,11 @@ This will perform a full check, going through all of your organizations and thei
 #### Optional Flags
 _Skip the GitHub scan and test only the upload_
 ```
-./augit gitlic --upload-only
+./gitlic-check gitlic --upload-only
 ```
 _Skip the upload step and perform only the GitHub scan_
 ```
-./augit gitlic --no-upload
+./gitlic-check gitlic --no-upload
 ```
 
 ## Configuration
@@ -64,7 +64,7 @@ GitLic requires a config file, located at `config/options.json`:
 {
   "github":
     "pat": "", // string
-    "ignoredOrgs": [], // []string (optional)
+    "includedOrgs": [], // []string (optional)
     "rmInvitesAfter": 336, // int (optional) // in hours (ex: 2 weeks = 336)
   "drive": // (optional)
     "outputDir": "", // string // id for output directory
@@ -73,7 +73,7 @@ GitLic requires a config file, located at `config/options.json`:
 ```
 
 #### GitHub
-You'll need to generate a personal access token [in your GitHub settings](https://github.com/settings/tokens). If you want to include private repositories in your reports, be sure to select the entire repo scope in the token settings. If you want to ignore any orgs in the process of scanning, put their names in the optional array. Finally, if you want to automatically remove invitations after a certain amount of time, include that option and the time frame in hours.
+You'll need to generate a personal access token [in your GitHub settings](https://github.com/settings/tokens). If you want to include private repositories in your reports, be sure to select the entire repo scope in the token settings. Add the subset of orgs included in your token using the config array `includedOrgs` as a whitelist. Finally, if you want to automatically remove invitations after a certain amount of time, include that option and the time frame in hours.
 
 >Note: Must be an owner of the org to pull data on private repos, members, and two-factor authentication
 

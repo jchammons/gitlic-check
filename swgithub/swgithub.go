@@ -12,17 +12,17 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// getIgnoredMap will turn the array of ignored orgs from the config file into a map that is easy to check against as we iterate over organizations returned from the GitHub API
-func getIgnoredMap(a []string) map[string]bool {
-	ignoredOrgs := make(map[string]bool)
+// getIncludedMap will turn the array of included orgs from the config file into a map that is easy to check against as we iterate over organizations returned from the GitHub API
+func getIncludedMap(a []string) map[string]bool {
+	includedOrgs := make(map[string]bool)
 	for _, org := range a {
-		ignoredOrgs[org] = true
+		includedOrgs[org] = true
 	}
-	return ignoredOrgs
+	return includedOrgs
 }
 
 func GetSWOrgs(ctx context.Context, ghClient *github.Client, cf config.Config) ([]*github.Organization, error) {
-	ignoredOrgs := getIgnoredMap(cf.Github.IgnoredOrgs)
+	includedOrgs := getIncludedMap(cf.Github.IncludedOrgs)
 	orgs := []*github.Organization{}
 	lo := &github.ListOptions{PerPage: 100}
 	for {
@@ -42,11 +42,11 @@ func GetSWOrgs(ctx context.Context, ghClient *github.Client, cf config.Config) (
 	}
 	validOrgs := []*github.Organization{}
 	for _, org := range orgs {
-		if ignoredOrgs == nil {
+		if includedOrgs == nil {
 			validOrgs = orgs
 			break
 		}
-		if !ignoredOrgs[*org.Login] {
+		if includedOrgs[*org.Login] {
 			validOrgs = append(validOrgs, org)
 		} else {
 			log.Printf("Ignored %s\n", *org.Login)
