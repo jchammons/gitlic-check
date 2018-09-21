@@ -20,6 +20,7 @@ type User struct {
 	LastName  string
 	Email     string
 	Enabled   bool
+	Username  string
 }
 
 type MSTokenResponse struct {
@@ -40,6 +41,7 @@ type ADObject struct {
 	Enabled           bool   `json:"accountEnabled"`
 	GivenName         string `json:"givenName"`
 	UserPrincipalName string `json:"userPrincipalName"`
+	Mail              string `json:"mail"`
 	ObjectID          string `json:"id"`
 	ObjectType        string `json:"@odata.type"`
 	Surname           string `json:"surname"`
@@ -95,8 +97,9 @@ func (p *Populator) GetUsers() ([]*User, error) {
 		users = append(users, &User{
 			FirstName: user.GivenName,
 			LastName:  user.Surname,
-			Email:     user.UserPrincipalName,
+			Email:     user.Mail,
 			Enabled:   user.Enabled,
+			Username:  user.UserPrincipalName,
 		})
 	}
 
@@ -142,8 +145,9 @@ func (p *Populator) GetDisabledUsers() ([]*User, error) {
 		users = append(users, &User{
 			FirstName: val.GivenName,
 			LastName:  val.Surname,
-			Email:     val.UserPrincipalName,
+			Email:     val.Mail,
 			Enabled:   val.Enabled,
+			Username:  val.UserPrincipalName,
 		})
 	}
 	p.nextDisabledLink = adResp.NextLink

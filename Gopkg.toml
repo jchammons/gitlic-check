@@ -24,7 +24,7 @@
 
 [[constraint]]
   name = "github.com/solarwinds/swio-users"
-  version = "0.5.3"
+  version = "0.6.0"
 
 [[constraint]]
   name = "github.com/appoptics/appoptics-apm-go"
