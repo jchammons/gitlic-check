@@ -31,7 +31,7 @@ type AugitDB struct {
 
 func (adb *AugitDB) Create(inUser *swio.User) error {
 	if !inUser.Enabled {
-		fmt.Printf("skipping or deleting %s for being disabled\n", inUser.Email)
+		fmt.Printf("skipping or deleting %s for being disabled\n", inUser.Username)
 		// Delete disabled users, so that the offboarding command can check for users existing within the
 		// Augit DB associated w/ every GH user
 		err := adb.checkForDeletion(inUser)
