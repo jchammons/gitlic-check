@@ -1,0 +1,1 @@
+add_column("github_users", "username", "string", {"default": ""})
