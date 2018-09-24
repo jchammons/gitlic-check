@@ -46,7 +46,7 @@ func GetSWOrgs(ctx context.Context, ghClient *github.Client, cf config.Config) (
 			validOrgs = orgs
 			break
 		}
-		if includedOrgs[*org.Login] {
+		if _, ok := includedOrgs[*org.Login]; ok {
 			validOrgs = append(validOrgs, org)
 		} else {
 			log.Printf("Ignored %s\n", *org.Login)
