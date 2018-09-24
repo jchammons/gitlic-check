@@ -56,16 +56,6 @@ func (adb *AugitDB) checkForDeletion(inUser *swio.User) error {
 	return adb.db.Destroy(queryUser)
 }
 
-func (adb *AugitDB) exists(inUser *swio.User) bool {
-	ghUser := &models.GithubUser{}
-	exists, err := adb.db.Where("LOWER(email) = LOWER(?)", inUser.Email).Exists(ghUser)
-	if err != nil {
-		fmt.Printf("error checking if user %s exists: %s\n", inUser.Email, err.Error())
-		return false
-	}
-	return exists
-}
-
 func (adb *AugitDB) upsert(inUser *swio.User) error {
 	return adb.db.Transaction(func(tx *pop.Connection) error {
 		foundUser := &models.GithubUser{}
