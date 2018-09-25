@@ -40,20 +40,7 @@ func (adb *AugitDB) Create(inUser *swio.User) error {
 		}
 		return nil
 	}
-	ghUser := &models.GithubUser{
-		Name:  fmt.Sprintf("%s %s", inUser.FirstName, inUser.LastName),
-		Email: inUser.Email,
-	}
-	if !adb.exists(inUser) {
-		vErrs, err := adb.db.ValidateAndCreate(ghUser)
-		if vErrs.HasAny() {
-			return vErrs
-		}
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	return adb.upsert(inUser)
 }
 
 func (adb *AugitDB) checkForDeletion(inUser *swio.User) error {
@@ -69,14 +56,38 @@ func (adb *AugitDB) checkForDeletion(inUser *swio.User) error {
 	return adb.db.Destroy(queryUser)
 }
 
-func (adb *AugitDB) exists(inUser *swio.User) bool {
-	ghUser := &models.GithubUser{}
-	exists, err := adb.db.Where("LOWER(email) = LOWER(?)", inUser.Email).Exists(ghUser)
-	if err != nil {
-		fmt.Printf("error checking if user %s exists: %s\n", inUser.Email, err.Error())
-		return false
-	}
-	return exists
+func (adb *AugitDB) upsert(inUser *swio.User) error {
+	return adb.db.Transaction(func(tx *pop.Connection) error {
+		foundUser := &models.GithubUser{}
+		err := tx.Where("LOWER(email) = LOWER(?)", inUser.Email).First(foundUser)
+		if err != nil && !models.IsErrRecordNotFound(err) {
+			return err
+		} else if err != nil && models.IsErrRecordNotFound(err) {
+			ghUser := &models.GithubUser{
+				Name:     fmt.Sprintf("%s %s", inUser.FirstName, inUser.LastName),
+				Email:    inUser.Email,
+				Username: inUser.Username,
+			}
+			vErrs, err_ := tx.ValidateAndCreate(ghUser)
+			if vErrs.HasAny() {
+				return vErrs
+			}
+			if err_ != nil {
+				return err_
+			}
+		} else {
+			foundUser.Username = inUser.Username
+			foundUser.Name = fmt.Sprintf("%s %s", inUser.FirstName, inUser.LastName)
+			vErrs, err_ := tx.ValidateAndUpdate(foundUser)
+			if vErrs.HasAny() {
+				return vErrs
+			}
+			if err_ != nil {
+				return err_
+			}
+		}
+		return nil
+	})
 }
 
 func PopulateDomainUsers() error {

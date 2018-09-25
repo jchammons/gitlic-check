@@ -15,6 +15,7 @@ type GithubUser struct {
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 	Email     string    `json:"email" db:"email"`
+	Username  string    `json:"username" db:"username"`
 	GithubID  string    `json:"github_id" db:"github_id"`
 	Name      string    `json:"name" db:"name"`
 	Admin     bool      `json:"admin" db:"admin"`
