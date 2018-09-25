@@ -75,7 +75,7 @@ func (adb *AugitDB) upsert(inUser *swio.User) error {
 			if err_ != nil {
 				return err_
 			}
-		} else if err == nil {
+		} else {
 			foundUser.Username = inUser.Username
 			foundUser.Name = fmt.Sprintf("%s %s", inUser.FirstName, inUser.LastName)
 			vErrs, err_ := tx.ValidateAndUpdate(foundUser)
