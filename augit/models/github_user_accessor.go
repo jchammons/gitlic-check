@@ -34,7 +34,7 @@ func (ghudb *GithubUserDB) ReplaceGHRow(inUser *GithubUser) error {
 		if inUser.GithubID == "" {
 			return errors.New("must provide a GitHub ID")
 		}
-		alreadyExists, err := ghudb.tx.Where("LOWER(github_id) = LOWER(?) AND LOWER(email) = LOWER(?)", inUser.GithubID, inUser.Email).Exists(&GithubUser{})
+		alreadyExists, err := ghudb.tx.Where("LOWER(github_id) = LOWER(?) AND LOWER(username) = LOWER(?)", inUser.GithubID, inUser.Username).Exists(&GithubUser{})
 		if err != nil {
 			return err
 		}
@@ -44,12 +44,11 @@ func (ghudb *GithubUserDB) ReplaceGHRow(inUser *GithubUser) error {
 		existingGHRow := &GithubUser{}
 		err = ghudb.tx.Where("LOWER(github_id) = LOWER(?)", inUser.GithubID).First(existingGHRow)
 		if err != nil {
-			log.Printf("Error finding existing GitHub user: %s\n", err.Error())
-			return errors.New("Could not find that GitHub user in SolarWinds organizations")
+			log.Printf("GitHub user %s submitted but was not found in any of our orgs\n", inUser.GithubID)
 		}
 
 		existingUser := &GithubUser{}
-		err = tx.Where("LOWER(email) = LOWER(?)", inUser.Email).First(existingUser)
+		err = tx.Where("LOWER(username) = LOWER(?)", inUser.Username).First(existingUser)
 		if err != nil {
 			return err
 		}
@@ -62,15 +61,20 @@ func (ghudb *GithubUserDB) ReplaceGHRow(inUser *GithubUser) error {
 		} else if err != nil {
 			return err
 		}
-		// Delete the old row with the GH ID
-		return tx.Destroy(existingGHRow)
+
+		if existingGHRow.GithubID != "" {
+			// Delete the old row with the GH ID
+			return tx.Destroy(existingGHRow)
+		}
+
+		return nil
 	})
 }
 
-// Find returns the user with the given email
-func (ghudb *GithubUserDB) Find(email string) (*GithubUser, error) {
+// Find returns the user with the given username
+func (ghudb *GithubUserDB) Find(username string) (*GithubUser, error) {
 	foundUser := &GithubUser{}
-	return foundUser, ghudb.tx.Where("LOWER(email) = LOWER(?)", email).First(foundUser)
+	return foundUser, ghudb.tx.Where("LOWER(username) = LOWER(?)", username).First(foundUser)
 }
 
 func (ghudb *GithubUserDB) FindByID(id uuid.UUID) (*GithubUser, error) {

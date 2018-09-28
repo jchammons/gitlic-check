@@ -40,8 +40,8 @@ func getEmail(token *samlsp.AuthorizationToken) string {
 func ShowUser(ghudb models.GithubUserAccessor) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		email := getCanonicalEmail(samlsp.Token(r.Context()))
-		user, err := ghudb.Find(email)
+		username := getCanonicalEmail(samlsp.Token(r.Context()))
+		user, err := ghudb.Find(username)
 		if err != nil {
 			log.Printf("Failed to find user with email %s. Error: %v\n", email, err)
 			w.WriteHeader(http.StatusBadGateway)
@@ -119,7 +119,8 @@ func AddUser(ghudb models.GithubUserAccessor) func(w http.ResponseWriter, r *htt
 		}
 
 		updateUser := &models.GithubUser{
-			Email:    getCanonicalEmail(samlsp.Token(r.Context())),
+			Email:    getEmail(samlsp.Token(r.Context())),
+			Username: getCanonicalEmail(samlsp.Token(r.Context())),
 			GithubID: req.GithubID,
 		}
 		err = ghudb.ReplaceGHRow(updateUser)
@@ -217,8 +218,8 @@ func AddServiceAccount(ghudb models.GithubUserAccessor, ghodb models.GithubOwner
 func AddAdmin(ghudb models.GithubUserAccessor) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
-		email := getCanonicalEmail(samlsp.Token(r.Context()))
-		user, err := ghudb.Find(email)
+		username := getCanonicalEmail(samlsp.Token(r.Context()))
+		user, err := ghudb.Find(username)
 		if err != nil {
 			log.Printf("Failed to find user. Error: %v\n", err)
 			w.WriteHeader(http.StatusBadGateway)
