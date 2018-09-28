@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/google/go-github/github"
@@ -16,7 +17,7 @@ import (
 func getIncludedMap(a []string) map[string]bool {
 	includedOrgs := make(map[string]bool)
 	for _, org := range a {
-		includedOrgs[org] = true
+		includedOrgs[strings.ToLower(org)] = true
 	}
 	return includedOrgs
 }
@@ -46,7 +47,7 @@ func GetSWOrgs(ctx context.Context, ghClient *github.Client, cf config.Config) (
 			validOrgs = orgs
 			break
 		}
-		if _, ok := includedOrgs[*org.Login]; ok {
+		if _, ok := includedOrgs[strings.ToLower(*org.Login)]; ok {
 			validOrgs = append(validOrgs, org)
 		} else {
 			log.Printf("Ignored %s\n", *org.Login)
