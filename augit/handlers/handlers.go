@@ -43,7 +43,7 @@ func ShowUser(ghudb models.GithubUserAccessor) func(w http.ResponseWriter, r *ht
 		username := getCanonicalEmail(samlsp.Token(r.Context()))
 		user, err := ghudb.Find(username)
 		if err != nil {
-			log.Printf("Failed to find user with email %s. Error: %v\n", email, err)
+			log.Printf("Failed to find user with email %s. Error: %v\n", username, err)
 			w.WriteHeader(http.StatusBadGateway)
 			w.Write([]byte(`{"error": "Could not find user"}`))
 			return
