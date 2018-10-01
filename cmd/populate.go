@@ -45,14 +45,17 @@ func (adb *AugitDB) Create(inUser *swio.User) error {
 
 func (adb *AugitDB) checkForDeletion(inUser *swio.User) error {
 	queryUser := &models.GithubUser{}
-	err := adb.db.Where("LOWER(email) = LOWER(?)", inUser.Email).First(queryUser)
+	if inUser.Username == "" {
+		return errors.New("can't delete user without username")
+	}
+	err := adb.db.Where("LOWER(username) = LOWER(?)", inUser.Username).First(queryUser)
 	if err != nil {
 		if models.IsErrRecordNotFound(err) {
 			return nil
 		}
 		return err
 	}
-	fmt.Printf("deleting %s for disabled or bad email\n", inUser.Email)
+	fmt.Printf("deleting %s for disabled or bad email\n", inUser.Username)
 	return adb.db.Destroy(queryUser)
 }
 
