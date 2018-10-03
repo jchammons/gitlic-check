@@ -29,14 +29,6 @@ if [[ $deploy = "true" ]]; then
     chmod +x kubectl && \
     export KUBECONFIG=kubeconfig && \
     ./kubectl -n solarwindsio set image cronjob gitlic-check-cron gitlic-check=quay.io/solarwinds/gitlic-check:$tag && \
-    sleep 5 && \
-    response=`./kubectl -n solarwindsio rollout status cronjob/gitlic-check-cron --watch=true` && \
-    if [[ $response = *"error"* ]]; then
-        echo "Deployment not successful with msg: '$response'. Rolling back. . . "
-        ./kubectl rollout undo cronjob/gitlic-check-cron
-        echo "Rolling back done . . . "
-        exit 1
-    fi
     ./kubectl -n solarwindsio set image cronjob augit-gh-report augit-gh-report=quay.io/solarwinds/augit-server:$tag && \
     ./kubectl -n solarwindsio set image cronjob augit-populator augit-populator=quay.io/solarwinds/augit-server:$tag && \
     ./kubectl -n solarwindsio set image deployment augit augit-server=quay.io/solarwinds/augit-server:$tag && \
