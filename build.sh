@@ -44,7 +44,7 @@ if [[ $deploy = "true" ]]; then
     response=`./kubectl -n solarwindsio rollout status deployments/augit --watch=true` && \
     if [[ $response = *"error"* ]]; then
         echo "Deployment not successful with msg: '$response'. Rolling back. . . "
-        ./kubectl rollout undo cronjob/gitlic-check-cron
+        ./kubectl rollout undo deployments/augit
         echo "Rolling back done . . . "
         exit 1
     fi
