@@ -62,6 +62,9 @@ func (adb *AugitDB) checkForDeletion(inUser *swio.User) error {
 func (adb *AugitDB) upsert(inUser *swio.User) error {
 	return adb.db.Transaction(func(tx *pop.Connection) error {
 		foundUser := &models.GithubUser{}
+		if inUser.Email == "" {
+			inUser.Email = inUser.Username
+		}
 		err := tx.Where("LOWER(email) = LOWER(?)", inUser.Email).First(foundUser)
 		if err != nil && !models.IsErrRecordNotFound(err) {
 			return err
