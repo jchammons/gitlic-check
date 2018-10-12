@@ -8,6 +8,7 @@ type GithubOwnerAccessor interface {
 	Create(*GithubOwner) error
 	ExistsByGithubIDInOrg(string, string) (bool, error)
 	List() ([]*GithubOwner, error)
+	Delete(string) error
 }
 
 type GithubOwnerDB struct {
@@ -29,4 +30,14 @@ func (ghodb *GithubOwnerDB) ExistsByGithubIDInOrg(ghID, org string) (bool, error
 func (ghodb *GithubOwnerDB) List() ([]*GithubOwner, error) {
 	owners := []*GithubOwner{}
 	return owners, ghodb.tx.All(&owners)
+}
+
+func (ghodb *GithubOwnerDB) Delete(ghID string) error {
+	foundOwner := &GithubOwner{}
+	err := ghodb.tx.Where("LOWER(github_id) = LOWER(?)", ghID).First(foundOwner)
+	if err != nil {
+		return err
+	}
+
+	return ghodb.tx.Destroy(foundOwner)
 }
