@@ -71,6 +71,76 @@ func persistUsers(ghudb models.GithubUserAccessor, ghodb models.GithubOwnerAcces
 		})
 	}
 
+	err = persistMembers(allMembers, ghudb, sadb)
+	if err != nil {
+		return err
+	}
+
+	err = persistOwners(allOwners, ghodb)
+	if err != nil {
+		return err
+	}
+
+	ghMembers := generateMembersMap(allMembers)
+	err = purgeOldUsers(ghMembers, ghudb, sadb)
+	if err != nil {
+		return err
+	}
+
+	allOwnerUsers := []*github.User{}
+	for _, org := range allOwners {
+		allOwnerUsers = append(allOwnerUsers, org.owners...)
+	}
+
+	ghOwners := generateMembersMap(allOwnerUsers)
+	err = purgeOldOwners(ghOwners, ghodb)
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+// generateMembersMap turns an array of GitHub members into a map of their logins so we can check if they are a member without iterating
+// through a full array every time
+func generateMembersMap(members []*github.User) map[string]bool {
+	newMap := map[string]bool{}
+	for _, member := range members {
+		if member.Login == nil {
+			continue
+		}
+		newMap[*member.Login] = true
+	}
+	return newMap
+}
+
+func purgeOldUsers(ghMembers map[string]bool, ghudb models.GithubUserAccessor, sadb models.ServiceAccountAccessor) error {
+	existingUsers, err := ghudb.ListGHUsers()
+	for _, user := range existingUsers {
+		if _, ok := ghMembers[user.GithubID]; !ok {
+			err = ghudb.Delete(user.GithubID)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func purgeOldOwners(ghMembers map[string]bool, ghodb models.GithubOwnerAccessor) error {
+	existingOwners, err := ghodb.List()
+	for _, owner := range existingOwners {
+		if _, ok := ghMembers[owner.GithubID]; !ok {
+			err = ghodb.Delete(owner.GithubID)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func persistMembers(allMembers []*github.User, ghudb models.GithubUserAccessor, sadb models.ServiceAccountAccessor) error {
 	for _, member := range allMembers {
 		if member.Login == nil {
 			continue
@@ -96,6 +166,10 @@ func persistUsers(ghudb models.GithubUserAccessor, ghodb models.GithubOwnerAcces
 			return err
 		}
 	}
+	return nil
+}
+
+func persistOwners(allOwners []*orgOwners, ghodb models.GithubOwnerAccessor) error {
 	for _, orgOwner := range allOwners {
 		for _, owner := range orgOwner.owners {
 			if owner.Login == nil {
@@ -114,5 +188,5 @@ func persistUsers(ghudb models.GithubUserAccessor, ghodb models.GithubOwnerAcces
 			}
 		}
 	}
-	return err
+	return nil
 }
