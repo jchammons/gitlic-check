@@ -19,7 +19,6 @@ import (
 var (
 	db            *pop.Connection
 	dryRun        bool
-	githubToken   string
 	orgsToProcess []string
 )
 
@@ -30,7 +29,6 @@ func init() {
 		fmt.Println("couldn't connect to db: ", err)
 		os.Exit(1)
 	}
-	offboardCmd.Flags().StringVar(&githubToken, "ghtoken", "", "personal token for GitHub org access")
 	offboardCmd.Flags().StringSliceVar(&orgsToProcess, "orgs", []string{}, "organization names to process")
 	offboardCmd.Flags().BoolVar(&dryRun, "dry", false, "set if you just want to dry run")
 	rootCmd.AddCommand(offboardCmd)
