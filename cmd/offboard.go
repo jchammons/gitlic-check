@@ -67,20 +67,27 @@ func offboard() {
 			fmt.Printf("Could not get members for %s, continuing to next org", *org.Login)
 		}
 		for _, memb := range members {
-			processMember(memb, client, org)
+			err := processMember(memb, client, org)
+			if err != nil {
+				fmt.Printf("Error processing member %s: %s", memb.GetLogin(), err)
+			}
 		}
 	}
 }
 
 func processMember(member *github.User, client *github.Client, org *github.Organization) error {
 	swiUser := &models.GithubUser{}
-	if member.Login == nil {
-		fmt.Printf("no Login for member %+v\n", member)
-		return nil
+	sa := &models.ServiceAccount{}
+	exists, err := db.Where("(LOWER(github_id) = LOWER(?) AND username != '') OR (LOWER(github_id) = LOWER(?) AND email != '')", member.GetLogin(), member.GetLogin()).Exists(swiUser)
+	if err != nil {
+		return err
 	}
-	exists, err := db.Where("github_id = ? AND username != ''", member.Login).Exists(swiUser)
-	if !exists {
-		fmt.Printf("Did not find registered account for %s\n", *member.Login)
+	saExists, err := db.Where("LOWER(github_id) = LOWER(?)", member.GetLogin()).Exists(sa)
+	if err != nil {
+		return err
+	}
+	if !exists && !saExists {
+		fmt.Printf("Did not find registered account for %s in org %s\n", member.GetLogin(), org.GetLogin())
 		if !dryRun {
 			_, err := client.Organizations.RemoveOrgMembership(context.Background(), member.GetLogin(), org.GetLogin())
 			if err != nil {
