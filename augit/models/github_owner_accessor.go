@@ -6,6 +6,7 @@ import (
 
 type GithubOwnerAccessor interface {
 	Create(*GithubOwner) error
+	ExistsByGithubID(string) (bool, error)
 	ExistsByGithubIDInOrg(string, string) (bool, error)
 	List() ([]*GithubOwner, error)
 	Delete(string) error
@@ -21,6 +22,10 @@ func NewGithubOwnerDB(tx *pop.Connection) *GithubOwnerDB {
 
 func (ghodb *GithubOwnerDB) Create(inUser *GithubOwner) error {
 	return ghodb.tx.Create(inUser)
+}
+
+func (ghodb *GithubOwnerDB) ExistsByGithubID(ghID string) (bool, error) {
+	return ghodb.tx.Where("LOWER(github_id = LOWER(?)", ghID).Exists(&GithubOwner{})
 }
 
 func (ghodb *GithubOwnerDB) ExistsByGithubIDInOrg(ghID, org string) (bool, error) {

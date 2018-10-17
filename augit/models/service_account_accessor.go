@@ -1,12 +1,15 @@
 package models
 
-import "github.com/gobuffalo/pop"
+import (
+	"github.com/gobuffalo/pop"
+)
 
 type ServiceAccountAccessor interface {
 	Create(*ServiceAccount) error
 	Exists(string) (bool, error)
 	FindByGithubID(string) (*ServiceAccount, error)
 	List() ([]*ServiceAccount, error)
+	Delete(string) error
 }
 
 type ServiceAccountDB struct {
@@ -39,4 +42,13 @@ func (sadb *ServiceAccountDB) List() ([]*ServiceAccount, error) {
 
 func (sadb *ServiceAccountDB) Exists(ghID string) (bool, error) {
 	return sadb.tx.Where("LOWER(github_id) = LOWER(?)", ghID).Exists(&ServiceAccount{})
+}
+
+func (sadb *ServiceAccountDB) Delete(ghID string) error {
+	sa := &ServiceAccount{}
+	err := sadb.tx.Where("LOWER(github_id) = LOWER(?)", ghID).First(sa)
+	if err != nil {
+		return err
+	}
+	return sadb.tx.Destroy(sa)
 }

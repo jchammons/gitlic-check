@@ -191,7 +191,6 @@ func AddServiceAccount(ghudb models.GithubUserAccessor, ghodb models.GithubOwner
 				return
 			}
 			if ghEntry.Username != "" || ghEntry.Email != "" {
-				log.Printf("Failed to create service account for %s; ID is already registered to another user\n", req.GithubID)
 				w.WriteHeader(http.StatusBadRequest)
 				w.Write([]byte(`{"error": "GitHub ID is already registered to a SolarWinds user.`))
 				return
@@ -227,6 +226,59 @@ func AddServiceAccount(ghudb models.GithubUserAccessor, ghodb models.GithubOwner
 		}
 		err = email.SendOwnerListEmail(getEmail(samlsp.Token(r.Context())), req.GithubID, owners)
 		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func RemoveServiceAccount(ghudb models.GithubUserAccessor, sadb models.ServiceAccountAccessor, ghodb models.GithubOwnerAccessor) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		inEmail := getCanonicalEmail(samlsp.Token(r.Context()))
+		user, err := ghudb.Find(inEmail)
+		if err != nil {
+			log.Printf("Failed to find user. Error: %v\n", err)
+			w.WriteHeader(http.StatusBadGateway)
+			w.Write([]byte(`{"error": "Could not find user"}`))
+			return
+		}
+
+		var req addGHRequest
+		err = json.NewDecoder(r.Body).Decode(&req)
+		if err != nil {
+			log.Printf("Failed to parse user data. Error: %v\n", err)
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(`{"error": "Could not parse user payload"}`))
+			return
+		}
+
+		sa, err := sadb.FindByGithubID(req.GithubID)
+		if err != nil || sa.GithubID == "" {
+			log.Printf("Failed to find service account for deletion. Error: %v\n", err)
+			w.WriteHeader(http.StatusBadGateway)
+			w.Write([]byte(`{"error": "Could not find a registered service account with that GitHub ID`))
+			return
+		}
+
+		if sa.AdminResponsible != user.ID {
+			isOwner, err := ghodb.ExistsByGithubID(user.GithubID)
+			if err != nil {
+				log.Printf("Failed to verify if submitter is a GitHub owner. Error: %v\n", err)
+			}
+			if !isOwner {
+				w.WriteHeader(http.StatusForbidden)
+				w.Write([]byte(`{"error": "Only the user who registered a service account or a GitHub org owner may remove it"`))
+				return
+			}
+		}
+
+		err = sadb.Delete(req.GithubID)
+		if err != nil {
+			log.Printf("Failed to remove service account. Error: %v\n", err)
+			w.WriteHeader(http.StatusBadGateway)
+			w.Write([]byte(`{"error": "Something went wrong. Could not remove the service account.`))
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+		return
 	}
 }
 
