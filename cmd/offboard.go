@@ -64,12 +64,14 @@ func offboard() {
 		memOpt := &github.ListMembersOptions{ListOptions: *lo}
 		members, err := swgithub.GetOrgMembers(context.Background(), client, org, memOpt)
 		if err != nil {
-			fmt.Printf("Could not get members for %s, continuing to next org", *org.Login)
+			fmt.Printf("50002: Could not get members for %s, continuing to next org", *org.Login)
+			fmt.Println(err)
 		}
 		for _, memb := range members {
 			err := processMember(memb, client, org)
 			if err != nil {
-				fmt.Printf("Error processing member %s: %s", memb.GetLogin(), err)
+				fmt.Printf("50001: Error processing member %s: %s", memb.GetLogin(), err)
+				fmt.Println(err)
 			}
 		}
 	}
@@ -89,6 +91,7 @@ func processMember(member *github.User, client *github.Client, org *github.Organ
 	if !exists && !saExists {
 		fmt.Printf("Did not find registered account for %s in org %s\n", member.GetLogin(), org.GetLogin())
 		if !dryRun {
+			fmt.Printf("Removing %s from %s\n", member.GetLogin(), org.GetLogin())
 			_, err := client.Organizations.RemoveOrgMembership(context.Background(), member.GetLogin(), org.GetLogin())
 			if err != nil {
 				return err
