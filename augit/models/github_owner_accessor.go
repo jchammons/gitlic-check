@@ -25,7 +25,7 @@ func (ghodb *GithubOwnerDB) Create(inUser *GithubOwner) error {
 }
 
 func (ghodb *GithubOwnerDB) ExistsByGithubID(ghID string) (bool, error) {
-	return ghodb.tx.Where("LOWER(github_id = LOWER(?)", ghID).Exists(&GithubOwner{})
+	return ghodb.tx.Where("LOWER(github_id) = LOWER(?)", ghID).Exists(&GithubOwner{})
 }
 
 func (ghodb *GithubOwnerDB) ExistsByGithubIDInOrg(ghID, org string) (bool, error) {

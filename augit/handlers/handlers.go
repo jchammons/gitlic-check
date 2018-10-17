@@ -102,14 +102,14 @@ func ShowAccounts(ghudb models.GithubUserAccessor, sadb models.ServiceAccountAcc
 	}
 }
 
-type addGHRequest struct {
+type ghRequest struct {
 	GithubID string `json:"github_id"`
 }
 
 func AddUser(ghudb models.GithubUserAccessor) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		var req addGHRequest
+		var req ghRequest
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			log.Printf("Failed to parse user data. Error: %v\n", err)
@@ -167,7 +167,7 @@ func AddServiceAccount(ghudb models.GithubUserAccessor, ghodb models.GithubOwner
 			w.Write([]byte(`{"error": "Could not find user"}`))
 			return
 		}
-		var req addGHRequest
+		var req ghRequest
 		err = json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			log.Printf("Failed to parse user data. Error: %v\n", err)
@@ -232,6 +232,7 @@ func AddServiceAccount(ghudb models.GithubUserAccessor, ghodb models.GithubOwner
 func RemoveServiceAccount(ghudb models.GithubUserAccessor, sadb models.ServiceAccountAccessor, ghodb models.GithubOwnerAccessor) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		vars := mux.Vars(r)
 		inEmail := getCanonicalEmail(samlsp.Token(r.Context()))
 		user, err := ghudb.Find(inEmail)
 		if err != nil {
@@ -241,17 +242,15 @@ func RemoveServiceAccount(ghudb models.GithubUserAccessor, sadb models.ServiceAc
 			return
 		}
 
-		var req addGHRequest
-		err = json.NewDecoder(r.Body).Decode(&req)
-		if err != nil {
-			log.Printf("Failed to parse user data. Error: %v\n", err)
+		githubID, ok := vars["githubid"]
+		if !ok {
 			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(`{"error": "Could not parse user payload"}`))
+			w.Write([]byte(`{"error": "Must supply the GitHub ID for the service account you want to remove"}`))
 			return
 		}
 
-		sa, err := sadb.FindByGithubID(req.GithubID)
-		if err != nil || sa.GithubID == "" {
+		sa, err := sadb.FindByGithubID(githubID)
+		if err != nil {
 			log.Printf("Failed to find service account for deletion. Error: %v\n", err)
 			w.WriteHeader(http.StatusBadGateway)
 			w.Write([]byte(`{"error": "Could not find a registered service account with that GitHub ID`))
@@ -270,7 +269,7 @@ func RemoveServiceAccount(ghudb models.GithubUserAccessor, sadb models.ServiceAc
 			}
 		}
 
-		err = sadb.Delete(req.GithubID)
+		err = sadb.Delete(githubID)
 		if err != nil {
 			log.Printf("Failed to remove service account. Error: %v\n", err)
 			w.WriteHeader(http.StatusBadGateway)
@@ -334,7 +333,7 @@ func RemoveAdmin(ghudb models.GithubUserAccessor) func(w http.ResponseWriter, r 
 			return
 		}
 		if !user.Admin {
-			log.Printf("Non-admin attempted to add admin: %s", user.Email)
+			log.Printf("Non-admin attempted to remove admin: %s", user.Email)
 			w.WriteHeader(http.StatusForbidden)
 			w.Write([]byte(`{"error": "Must be admin to remove admin"}`))
 			return
