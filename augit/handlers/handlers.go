@@ -102,14 +102,14 @@ func ShowAccounts(ghudb models.GithubUserAccessor, sadb models.ServiceAccountAcc
 	}
 }
 
-type addGHRequest struct {
+type ghRequest struct {
 	GithubID string `json:"github_id"`
 }
 
 func AddUser(ghudb models.GithubUserAccessor) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		var req addGHRequest
+		var req ghRequest
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			log.Printf("Failed to parse user data. Error: %v\n", err)
@@ -167,7 +167,7 @@ func AddServiceAccount(ghudb models.GithubUserAccessor, ghodb models.GithubOwner
 			w.Write([]byte(`{"error": "Could not find user"}`))
 			return
 		}
-		var req addGHRequest
+		var req ghRequest
 		err = json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			log.Printf("Failed to parse user data. Error: %v\n", err)
@@ -182,6 +182,20 @@ func AddServiceAccount(ghudb models.GithubUserAccessor, ghodb models.GithubOwner
 		}
 		exists, err := sadb.Exists(req.GithubID)
 		if !exists {
+			// Check to ensure GH id is not already associated with a SW user
+			ghEntry, err := ghudb.FindByGithubID(req.GithubID)
+			if err != nil {
+				log.Printf("Failed to verify GitHub ID for service account is not already registered. Error: %v\n", err)
+				w.WriteHeader(http.StatusBadGateway)
+				w.Write([]byte(`{"error": "Could not verify GitHub ID's current registration status.`))
+				return
+			}
+			if ghEntry.Username != "" || ghEntry.Email != "" {
+				w.WriteHeader(http.StatusBadRequest)
+				w.Write([]byte(`{"error": "GitHub ID is already registered to a SolarWinds user.`))
+				return
+			}
+
 			err = sadb.Create(newSA)
 			if err != nil {
 				log.Printf("Failed to create service account. Error: %v\n", err)
@@ -212,6 +226,58 @@ func AddServiceAccount(ghudb models.GithubUserAccessor, ghodb models.GithubOwner
 		}
 		err = email.SendOwnerListEmail(getEmail(samlsp.Token(r.Context())), req.GithubID, owners)
 		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func RemoveServiceAccount(ghudb models.GithubUserAccessor, sadb models.ServiceAccountAccessor, ghodb models.GithubOwnerAccessor) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		vars := mux.Vars(r)
+		inEmail := getCanonicalEmail(samlsp.Token(r.Context()))
+		user, err := ghudb.Find(inEmail)
+		if err != nil {
+			log.Printf("Failed to find user. Error: %v\n", err)
+			w.WriteHeader(http.StatusBadGateway)
+			w.Write([]byte(`{"error": "Could not find user"}`))
+			return
+		}
+
+		githubID, ok := vars["githubid"]
+		if !ok {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(`{"error": "Must supply the GitHub ID for the service account you want to remove"}`))
+			return
+		}
+
+		sa, err := sadb.FindByGithubID(githubID)
+		if err != nil {
+			log.Printf("Failed to find service account for deletion. Error: %v\n", err)
+			w.WriteHeader(http.StatusBadGateway)
+			w.Write([]byte(`{"error": "Could not find a registered service account with that GitHub ID`))
+			return
+		}
+
+		if sa.AdminResponsible != user.ID {
+			isOwner, err := ghodb.ExistsByGithubID(user.GithubID)
+			if err != nil {
+				log.Printf("Failed to verify if submitter is a GitHub owner. Error: %v\n", err)
+			}
+			if !isOwner {
+				w.WriteHeader(http.StatusForbidden)
+				w.Write([]byte(`{"error": "Only the user who registered a service account or a GitHub org owner may remove it"`))
+				return
+			}
+		}
+
+		err = sadb.Delete(githubID)
+		if err != nil {
+			log.Printf("Failed to remove service account. Error: %v\n", err)
+			w.WriteHeader(http.StatusBadGateway)
+			w.Write([]byte(`{"error": "Something went wrong. Could not remove the service account.`))
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+		return
 	}
 }
 
@@ -267,7 +333,7 @@ func RemoveAdmin(ghudb models.GithubUserAccessor) func(w http.ResponseWriter, r 
 			return
 		}
 		if !user.Admin {
-			log.Printf("Non-admin attempted to add admin: %s", user.Email)
+			log.Printf("Non-admin attempted to remove admin: %s", user.Email)
 			w.WriteHeader(http.StatusForbidden)
 			w.Write([]byte(`{"error": "Must be admin to remove admin"}`))
 			return
