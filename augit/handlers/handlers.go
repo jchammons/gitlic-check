@@ -187,12 +187,12 @@ func AddServiceAccount(ghudb models.GithubUserAccessor, ghodb models.GithubOwner
 			if err != nil {
 				log.Printf("Failed to verify GitHub ID for service account is not already registered. Error: %v\n", err)
 				w.WriteHeader(http.StatusBadGateway)
-				w.Write([]byte(`{"error": "Could not verify GitHub ID's current registration status.`))
+				w.Write([]byte(`{"error": "Could not verify GitHub ID's current registration status"}`))
 				return
 			}
 			if ghEntry.Username != "" || ghEntry.Email != "" {
 				w.WriteHeader(http.StatusBadRequest)
-				w.Write([]byte(`{"error": "GitHub ID is already registered to a SolarWinds user.`))
+				w.Write([]byte(`{"error": "GitHub ID is already registered to a SolarWinds user"}`))
 				return
 			}
 
@@ -253,7 +253,7 @@ func RemoveServiceAccount(ghudb models.GithubUserAccessor, sadb models.ServiceAc
 		if err != nil {
 			log.Printf("Failed to find service account for deletion. Error: %v\n", err)
 			w.WriteHeader(http.StatusBadGateway)
-			w.Write([]byte(`{"error": "Could not find a registered service account with that GitHub ID`))
+			w.Write([]byte(`{"error": "Could not find a registered service account with that GitHub ID"}`))
 			return
 		}
 
@@ -264,7 +264,7 @@ func RemoveServiceAccount(ghudb models.GithubUserAccessor, sadb models.ServiceAc
 			}
 			if !isOwner {
 				w.WriteHeader(http.StatusForbidden)
-				w.Write([]byte(`{"error": "Only the user who registered a service account or a GitHub org owner may remove it"`))
+				w.Write([]byte(`{"error": "Only the user who registered a service account or a GitHub org owner may remove it"}`))
 				return
 			}
 		}
@@ -273,7 +273,7 @@ func RemoveServiceAccount(ghudb models.GithubUserAccessor, sadb models.ServiceAc
 		if err != nil {
 			log.Printf("Failed to remove service account. Error: %v\n", err)
 			w.WriteHeader(http.StatusBadGateway)
-			w.Write([]byte(`{"error": "Something went wrong. Could not remove the service account.`))
+			w.Write([]byte(`{"error": "Something went wrong. Could not remove the service account."}`))
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
