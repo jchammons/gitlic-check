@@ -225,7 +225,7 @@ func AddServiceAccount(ghudb models.GithubUserAccessor, ghodb models.GithubOwner
 			err = sadb.Create(newSA)
 			if err != nil {
 				log.Printf("Failed to create service account. Error: %v\n", err)
-				errPayload := augit.LogAndFormatError(ERR_DB_WRITE, "Could not service account")
+				errPayload := augit.LogAndFormatError(ERR_DB_WRITE, "Could not create service account")
 				w.WriteHeader(http.StatusBadGateway)
 				w.Write(errPayload)
 				return
