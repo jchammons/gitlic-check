@@ -13,6 +13,7 @@ type GithubUserAccessor interface {
 	ReplaceGHRow(*GithubUser) error
 	Find(string) (*GithubUser, error)
 	FindByID(uuid.UUID) (*GithubUser, error)
+	FindByGithubID(string) (*GithubUser, error)
 	ExistsByGithubID(string) (bool, error)
 	ListGHUsers() ([]*GithubUser, error)
 	Delete(string) error
@@ -80,6 +81,11 @@ func (ghudb *GithubUserDB) Find(username string) (*GithubUser, error) {
 func (ghudb *GithubUserDB) FindByID(id uuid.UUID) (*GithubUser, error) {
 	foundUser := &GithubUser{}
 	return foundUser, ghudb.tx.Where("id = ?", id).First(foundUser)
+}
+
+func (ghudb *GithubUserDB) FindByGithubID(ghID string) (*GithubUser, error) {
+	foundUser := &GithubUser{}
+	return foundUser, ghudb.tx.Where("LOWER(github_id) = LOWER(?)", ghID).First(foundUser)
 }
 
 //
