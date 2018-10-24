@@ -132,7 +132,7 @@ func purgeOldUsers(ghMembers map[string]bool, ghudb models.GithubUserAccessor, s
 func purgeOldOwners(ghMembers map[string]bool, ghodb models.GithubOwnerAccessor) error {
 	existingOwners, err := ghodb.List()
 	for _, owner := range existingOwners {
-		if _, ok := ghMembers[owner.GithubID]; !ok {
+		if _, ok := ghMembers[strings.ToLower(owner.GithubID)]; !ok {
 			err = ghodb.Delete(owner.GithubID)
 			if err != nil {
 				return err
