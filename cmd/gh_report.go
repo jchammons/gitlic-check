@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/gobuffalo/pop"
 	"github.com/google/go-github/github"
@@ -109,7 +110,7 @@ func generateMembersMap(members []*github.User) map[string]bool {
 		if member.Login == nil {
 			continue
 		}
-		newMap[*member.Login] = true
+		newMap[strings.ToLower(*member.Login)] = true
 	}
 	return newMap
 }
@@ -117,11 +118,12 @@ func generateMembersMap(members []*github.User) map[string]bool {
 func purgeOldUsers(ghMembers map[string]bool, ghudb models.GithubUserAccessor, sadb models.ServiceAccountAccessor) error {
 	existingUsers, err := ghudb.ListGHUsers()
 	for _, user := range existingUsers {
-		if _, ok := ghMembers[user.GithubID]; !ok {
+		if _, ok := ghMembers[strings.ToLower(user.GithubID)]; !ok {
 			err = ghudb.Delete(user.GithubID)
 			if err != nil {
 				return err
 			}
+			log.Printf("Deleted github_user with ID: %s\n", user.GithubID)
 		}
 	}
 	return nil
@@ -135,6 +137,7 @@ func purgeOldOwners(ghMembers map[string]bool, ghodb models.GithubOwnerAccessor)
 			if err != nil {
 				return err
 			}
+			log.Printf("Deleted github_owner with ID: %s\n", owner.GithubID)
 		}
 	}
 	return nil
