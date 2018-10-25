@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 
@@ -26,7 +25,7 @@ func init() {
 	var err error
 	db, err = pop.Connect(os.Getenv("ENVIRONMENT"))
 	if err != nil {
-		fmt.Println("couldn't connect to db: ", err)
+		log.Println("couldn't connect to db: ", err)
 		os.Exit(1)
 	}
 	offboardCmd.Flags().StringSliceVar(&orgsToProcess, "orgs", []string{}, "organization names to process")
@@ -37,11 +36,11 @@ func init() {
 var offboardCmd = &cobra.Command{
 	Use: "offboard",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("==========")
-		fmt.Println("Starting offboard process with these orgs:")
-		fmt.Printf("%+v\n", orgsToProcess)
-		fmt.Println("Dry run is:")
-		fmt.Printf("%+v\n", dryRun)
+		log.Println("==========")
+		log.Println("Starting offboard process with these orgs:")
+		log.Printf("%+v\n", orgsToProcess)
+		log.Println("Dry run is:")
+		log.Printf("%+v\n", dryRun)
 		offboard()
 	},
 }
@@ -64,14 +63,14 @@ func offboard() {
 		memOpt := &github.ListMembersOptions{ListOptions: *lo}
 		members, err := swgithub.GetOrgMembers(context.Background(), client, org, memOpt)
 		if err != nil {
-			fmt.Printf("50002: Could not get members for %s, continuing to next org", *org.Login)
-			fmt.Println(err)
+			log.Printf("50002: Could not get members for %s, continuing to next org", *org.Login)
+			log.Println(err)
 		}
 		for _, memb := range members {
 			err := processMember(memb, client, org)
 			if err != nil {
-				fmt.Printf("50001: Error processing member %s: %s", memb.GetLogin(), err)
-				fmt.Println(err)
+				log.Printf("50001: Error processing member %s: %s", memb.GetLogin(), err)
+				log.Println(err)
 			}
 		}
 	}
@@ -89,9 +88,9 @@ func processMember(member *github.User, client *github.Client, org *github.Organ
 		return err
 	}
 	if !exists && !saExists {
-		fmt.Printf("Did not find registered account for %s in org %s\n", member.GetLogin(), org.GetLogin())
+		log.Printf("Did not find registered account for %s in org %s\n", member.GetLogin(), org.GetLogin())
 		if !dryRun {
-			fmt.Printf("Removing %s from %s\n", member.GetLogin(), org.GetLogin())
+			log.Printf("Removing %s from %s\n", member.GetLogin(), org.GetLogin())
 			_, err := client.Organizations.RemoveOrgMembership(context.Background(), member.GetLogin(), org.GetLogin())
 			if err != nil {
 				return err
