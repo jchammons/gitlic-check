@@ -82,12 +82,6 @@ func persistUsers(ghudb models.GithubUserAccessor, ghodb models.GithubOwnerAcces
 		return err
 	}
 
-	ghMembers := generateMembersMap(allMembers)
-	err = purgeOldUsers(ghMembers, ghudb, sadb)
-	if err != nil {
-		return err
-	}
-
 	allOwnerUsers := []*github.User{}
 	for _, org := range allOwners {
 		allOwnerUsers = append(allOwnerUsers, org.owners...)
@@ -113,20 +107,6 @@ func generateMembersMap(members []*github.User) map[string]bool {
 		newMap[strings.ToLower(*member.Login)] = true
 	}
 	return newMap
-}
-
-func purgeOldUsers(ghMembers map[string]bool, ghudb models.GithubUserAccessor, sadb models.ServiceAccountAccessor) error {
-	existingUsers, err := ghudb.ListGHUsers()
-	for _, user := range existingUsers {
-		if _, ok := ghMembers[strings.ToLower(user.GithubID)]; !ok {
-			err = ghudb.Delete(user.GithubID)
-			if err != nil {
-				return err
-			}
-			log.Printf("Deleted github_user with ID: %s\n", user.GithubID)
-		}
-	}
-	return nil
 }
 
 func purgeOldOwners(ghMembers map[string]bool, ghodb models.GithubOwnerAccessor) error {
