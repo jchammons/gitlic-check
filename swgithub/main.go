@@ -115,7 +115,7 @@ func RunGitlicCheck(ctx context.Context, cf config.Config, fo map[string]*os.Fil
 
 	orgs, err := GetSWOrgs(ctx, ghClient, cf)
 	if err != nil {
-		log.Printf("Could not get orgs: %s", err.Error())
+		log.Printf("Failed to get orgs: %s", err.Error())
 		return
 	}
 
@@ -155,6 +155,7 @@ func RunGitlicCheck(ctx context.Context, cf config.Config, fo map[string]*os.Fil
 		var retries []string
 		commitsMap := make(map[string][]*github.WeeklyCommitActivity)
 		modsMap := make(map[string][]*github.WeeklyStats)
+
 		for _, repo := range repos {
 			if _, err := fo["repos.csv"].WriteString(fmt.Sprint(*org.Login, ",", *repo.Name, ",", *repo.Private, ",", *repo.Fork, ",")); err != nil {
 				log.Printf("Failed to write to repos.csv on %s with %s\n", *org.Login, err)
@@ -163,36 +164,35 @@ func RunGitlicCheck(ctx context.Context, cf config.Config, fo map[string]*os.Fil
 			lics, _, err := ghClient.Repositories.License(ctx, *repo.Owner.Login, *repo.Name)
 			if err != nil {
 				fo["repos.csv"].WriteString("None\n")
-				continue
-			}
-
-			if _, err = fo["repos.csv"].WriteString(fmt.Sprint(*lics.License.Name, "\n")); err != nil {
-				log.Printf("Failed to write to repos.csv on %s with %s\n", *org.Login, err)
+			} else {
+				if _, err = fo["repos.csv"].WriteString(fmt.Sprint(*lics.License.Name, "\n")); err != nil {
+					log.Printf("Failed to write to repos.csv on %s with %s\n", *org.Login, err)
+				}
 			}
 
 			commits, err, cmRetry := GetCommitActivity(ctx, ghClient, *org.Login, *repo.Name)
 			if err != nil {
 				log.Printf("Failed to get commit activity for %s. Error: %v\n", *repo.Name, err)
-				continue
-			}
-			mods, modsErr, mdRetry := GetAdditionsDeletions(ctx, ghClient, *org.Login, *repo.Name)
-			if modsErr != nil {
-				log.Printf("Failed to get additions/deletions for %s. Error: %v\n", *repo.Name, err)
-			}
-
-			if cmRetry || mdRetry {
-				retries = append(retries, *repo.Name)
-
-				if !cmRetry {
-					commitsMap[*repo.Name] = commits
+			} else {
+				mods, err, mdRetry := GetAdditionsDeletions(ctx, ghClient, *org.Login, *repo.Name)
+				if err != nil {
+					log.Printf("Failed to get additions/deletions for %s. Error: %v\n", *repo.Name, err)
 				}
-				if !mdRetry {
-					modsMap[*repo.Name] = mods
-				}
-				continue
-			}
 
-			saveRepoStats(ctx, fo, *org.Login, *repo.Name, commits, mods)
+				if cmRetry || mdRetry {
+					retries = append(retries, *repo.Name)
+
+					if !cmRetry {
+						commitsMap[*repo.Name] = commits
+					}
+					if !mdRetry {
+						modsMap[*repo.Name] = mods
+					}
+					continue
+				}
+
+				saveRepoStats(ctx, fo, *org.Login, *repo.Name, commits, mods)
+			}
 		}
 
 		if len(retries) > 0 {

@@ -110,12 +110,12 @@ func GetOrgOwners(ctx context.Context, ghClient *github.Client, org *github.Orga
 
 func GetOrgRepositories(ctx context.Context, ghClient *github.Client, org *github.Organization) ([]*github.Repository, error) {
 	var repos []*github.Repository
-	repoOpt := &github.RepositoryListByOrgOptions{
+	opt := &github.RepositoryListByOrgOptions{
 		ListOptions: github.ListOptions{PerPage: 100},
 	}
 
 	for {
-		partialRepos, resp, err := ghClient.Repositories.ListByOrg(ctx, *org.Login, repoOpt)
+		partialRepos, resp, err := ghClient.Repositories.ListByOrg(ctx, *org.Login, opt)
 		if err != nil {
 			return nil, err
 		}
@@ -123,10 +123,10 @@ func GetOrgRepositories(ctx context.Context, ghClient *github.Client, org *githu
 		repos = append(repos, partialRepos...)
 
 		if resp.NextPage == 0 {
-			repoOpt.Page = 1
+			opt.Page = 1
 			break
 		}
-		repoOpt.Page = resp.NextPage
+		opt.Page = resp.NextPage
 	}
 
 	return repos, nil
