@@ -7,6 +7,7 @@ RUN GOOS=linux GOARCH=amd64 go build -a -o /bin/gitlic-check
 FROM alpine:3.7
 RUN mkdir /lib64 && ln -s /lib/libc.musl-x86_64.so.1 /lib64/ld-linux-x86-64.so.2
 RUN apk update && apk add ca-certificates && rm -rf /var/cache/apk/*
+WORKDIR /bin/
 COPY --from=builder /bin/gitlic-check .
-ADD database.yml .
-CMD ./gitlic-check gitlic
+ADD database.yml /bin/
+CMD /bin/gitlic-check gitlic
