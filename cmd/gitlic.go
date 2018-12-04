@@ -62,7 +62,7 @@ func run() {
 	if uploadOnly == true && cf.Drive == nil {
 		log.Fatalln("To use the test-upload flag, you must specify the relevant config parameters. See README.\n")
 	}
-	filesToOutput := []string{"repos.csv", "users.csv", "invites.csv"}
+	filesToOutput := []string{"repos.csv", "stats.csv", "users.csv", "invites.csv"}
 	fo := prepareOutput(uploadOnly, filesToOutput)
 	defer func() {
 		for _, file := range fo {
@@ -79,7 +79,6 @@ func run() {
 				log.Fatal(err)
 			}
 		}
-
 	}
 
 	if noUpload == false && cf.Drive != nil {

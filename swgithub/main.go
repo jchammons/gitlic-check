@@ -13,6 +13,8 @@ import (
 	"golang.org/x/oauth2"
 )
 
+var weekdays [7]string
+
 // getIncludedMap will turn the array of included orgs from the config file into a map that is easy to check against as we iterate over organizations returned from the GitHub API
 func getIncludedMap(a []string) map[string]bool {
 	includedOrgs := make(map[string]bool)
@@ -22,87 +24,73 @@ func getIncludedMap(a []string) map[string]bool {
 	return includedOrgs
 }
 
-func GetSWOrgs(ctx context.Context, ghClient *github.Client, cf config.Config) ([]*github.Organization, error) {
-	includedOrgs := getIncludedMap(cf.Github.IncludedOrgs)
-	orgs := []*github.Organization{}
-	lo := &github.ListOptions{PerPage: 100}
-	for {
-		partialOrgs, resp, err := ghClient.Organizations.List(ctx, "", lo)
-		if err != nil {
-			log.Fatalf("Organizations.List failed with %s\n", err)
-			return nil, err
-		}
+func saveRepoStats(ctx context.Context, fo map[string]*os.File, org string, repo string, commits []*github.WeeklyCommitActivity, mods []*github.WeeklyStats) {
+	totalCommits := 0
+	linesAdded := 0
+	linesRemoved := 0
+	mostCommitsOneDay := 0
+	mostCommitsOneWeek := 0
+	var mostCommittable string
+	highestDayCounts := map[string]int{"Sunday": 0, "Monday": 0, "Tuesday": 0, "Wednesday": 0, "Thursday": 0, "Friday": 0, "Saturday": 0}
 
-		orgs = append(orgs, partialOrgs...)
+	for _, commit := range commits {
+		totalCommits += *commit.Total
 
-		if resp.NextPage == 0 {
-			lo.Page = 1
-			break
+		if *commit.Total > 0 {
+			highestDay := 0
+			highestDayInd := 0
+			weekTotal := 0
+			for i, dayTotal := range commit.Days {
+				weekTotal += dayTotal
+
+				if dayTotal > highestDay {
+					highestDayInd = i
+				}
+				if dayTotal > mostCommitsOneDay {
+					mostCommitsOneDay = dayTotal
+				}
+			}
+			highestDayCounts[weekdays[highestDayInd]]++
+			if weekTotal > mostCommitsOneWeek {
+				mostCommitsOneWeek = weekTotal
+			}
 		}
-		lo.Page = resp.NextPage
 	}
-	validOrgs := []*github.Organization{}
-	for _, org := range orgs {
-		if includedOrgs == nil {
-			validOrgs = orgs
-			break
+
+	if totalCommits > 0 {
+		highestCount := 0
+		for day, count := range highestDayCounts {
+			if count > highestCount {
+				mostCommittable = day
+			}
 		}
-		if _, ok := includedOrgs[strings.ToLower(*org.Login)]; ok {
-			validOrgs = append(validOrgs, org)
-		} else {
-			log.Printf("Ignored %s\n", *org.Login)
+	} else {
+		mostCommittable = "N/A"
+	}
+
+	mostLinesAddedOneWeek := 0
+	mostLinesRemovedOneWeek := 0
+	for _, mod := range mods {
+		linesAdded += *mod.Additions
+		linesRemoved += *mod.Deletions
+
+		if *mod.Additions > mostLinesAddedOneWeek {
+			mostLinesAddedOneWeek = *mod.Additions
+		}
+
+		if *mod.Deletions < mostLinesRemovedOneWeek {
+			mostLinesRemovedOneWeek = *mod.Deletions
 		}
 	}
-	return validOrgs, nil
-}
 
-func GetOrgMembers(ctx context.Context, ghClient *github.Client, org *github.Organization, opt *github.ListMembersOptions) ([]*github.User, error) {
-	members := []*github.User{}
-	for {
-		partialMembers, resp, err := ghClient.Organizations.ListMembers(ctx, *org.Login, opt)
-		if err != nil {
-			log.Printf("Organizations.ListMembers, no filter, failed with %s\n", err)
-			return nil, err
-		}
+	fo["stats.csv"].WriteString(fmt.Sprint(org, ",", repo, ",", totalCommits, ",", mostCommitsOneDay, ",", mostCommitsOneWeek, ",", mostCommittable, ",", linesAdded, ",", linesRemoved, ",", mostLinesAddedOneWeek, ",", mostLinesRemovedOneWeek, "\n"))
 
-		members = append(members, partialMembers...)
-
-		if resp.NextPage == 0 {
-			opt.Page = 1
-			break
-		}
-		opt.Page = resp.NextPage
-	}
-	return members, nil
-}
-
-func GetOrgOwners(ctx context.Context, ghClient *github.Client, org *github.Organization) ([]*github.User, error) {
-	lo := &github.ListOptions{PerPage: 100}
-	memOpt := &github.ListMembersOptions{
-		ListOptions: *lo,
-		Role:        "admin",
-	}
-	members := []*github.User{}
-	for {
-		partialMembers, resp, err := ghClient.Organizations.ListMembers(ctx, *org.Login, memOpt)
-		if err != nil {
-			log.Printf("Organizations.ListMembers, only admin, failed with %s\n", err)
-			return nil, err
-		}
-
-		members = append(members, partialMembers...)
-
-		if resp.NextPage == 0 {
-			memOpt.Page = 1
-			break
-		}
-		memOpt.Page = resp.NextPage
-	}
-	return members, nil
+	return
 }
 
 // RunGitlicCheck begins the process of querying the GitHub API. It will loop through your organizations and their repositories and pull info on configuration, license, and users, including invitations. It will output the results to respective CSV files in the output folder. See the README for an idea of what these CSV reports contain.
 func RunGitlicCheck(ctx context.Context, cf config.Config, fo map[string]*os.File) {
+	weekdays = [7]string{"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"}
 	ghClient := github.NewClient(oauth2.NewClient(ctx, oauth2.StaticTokenSource(&oauth2.Token{AccessToken: cf.Github.Token})))
 	lo := &github.ListOptions{PerPage: 100}
 	maxInviteT := time.Duration(cf.Github.RmInvitesAfter) * time.Hour
@@ -110,6 +98,10 @@ func RunGitlicCheck(ctx context.Context, cf config.Config, fo map[string]*os.Fil
 	log.Print("Working...\n\n")
 
 	if _, err := fo["repos.csv"].WriteString("Org,Repo,Private,Fork,License\n"); err != nil {
+		log.Printf("Initial save to repos CSV failed with %s\n", err)
+	}
+
+	if _, err := fo["stats.csv"].WriteString("Org,Repo,Commits in Last Year,Most Commits in a Day,Most Commits in a Week,Most Committable Day,Total Lines Added,Total Lines Removed,Most Lines Added in a Week,Most Lines Removed in a Week\n"); err != nil {
 		log.Printf("Initial save to repos CSV failed with %s\n", err)
 	}
 
@@ -126,22 +118,12 @@ func RunGitlicCheck(ctx context.Context, cf config.Config, fo map[string]*os.Fil
 		log.Printf("Could not get orgs: %s", err.Error())
 		return
 	}
+
 	for i, org := range orgs {
-		var invites []*github.Invitation
-		for {
-			partialInvites, resp, err := ghClient.Organizations.ListPendingOrgInvitations(ctx, *org.Login, lo)
-			if err != nil {
-				log.Printf("Organizations.ListPendingOrgInvitations failed with %s\n", err)
-				return
-			}
-
-			invites = append(invites, partialInvites...)
-
-			if resp.NextPage == 0 {
-				lo.Page = 1
-				break
-			}
-			lo.Page = resp.NextPage
+		invites, err := GetOrgInvites(ctx, ghClient, org)
+		if err != nil {
+			log.Printf("Organizations.ListPendingOrgInvitations failed with %s\n", err)
+			return
 		}
 
 		if len(invites) > 0 {
@@ -164,27 +146,15 @@ func RunGitlicCheck(ctx context.Context, cf config.Config, fo map[string]*os.Fil
 			}
 		}
 
-		var repos []*github.Repository
-		repoOpt := &github.RepositoryListByOrgOptions{
-			ListOptions: github.ListOptions{PerPage: 100},
+		repos, err := GetOrgRepositories(ctx, ghClient, org)
+		if err != nil {
+			log.Fatalf("Repositories.ListByOrg failed with %s\n", err)
+			return
 		}
 
-		for {
-			partialRepos, resp, err := ghClient.Repositories.ListByOrg(ctx, *org.Login, repoOpt)
-			if err != nil {
-				log.Fatalf("Repositories.ListByOrg failed with %s\n", err)
-				return
-			}
-
-			repos = append(repos, partialRepos...)
-
-			if resp.NextPage == 0 {
-				repoOpt.Page = 1
-				break
-			}
-			repoOpt.Page = resp.NextPage
-		}
-
+		var retries []string
+		commitsMap := make(map[string][]*github.WeeklyCommitActivity)
+		modsMap := make(map[string][]*github.WeeklyStats)
 		for _, repo := range repos {
 			if _, err := fo["repos.csv"].WriteString(fmt.Sprint(*org.Login, ",", *repo.Name, ",", *repo.Private, ",", *repo.Fork, ",")); err != nil {
 				log.Printf("Failed to write to repos.csv on %s with %s\n", *org.Login, err)
@@ -198,6 +168,61 @@ func RunGitlicCheck(ctx context.Context, cf config.Config, fo map[string]*os.Fil
 
 			if _, err = fo["repos.csv"].WriteString(fmt.Sprint(*lics.License.Name, "\n")); err != nil {
 				log.Printf("Failed to write to repos.csv on %s with %s\n", *org.Login, err)
+			}
+
+			commits, err, cmRetry := GetCommitActivity(ctx, ghClient, *org.Login, *repo.Name)
+			if err != nil {
+				log.Printf("Failed to get commit activity for %s. Error: %v\n", *repo.Name, err)
+				continue
+			}
+			mods, modsErr, mdRetry := GetAdditionsDeletions(ctx, ghClient, *org.Login, *repo.Name)
+			if modsErr != nil {
+				log.Printf("Failed to get additions/deletions for %s. Error: %v\n", *repo.Name, err)
+			}
+
+			if cmRetry || mdRetry {
+				retries = append(retries, *repo.Name)
+
+				if !cmRetry {
+					commitsMap[*repo.Name] = commits
+				}
+				if !mdRetry {
+					modsMap[*repo.Name] = mods
+				}
+				continue
+			}
+
+			saveRepoStats(ctx, fo, *org.Login, *repo.Name, commits, mods)
+		}
+
+		if len(retries) > 0 {
+			time.Sleep(3000 * time.Millisecond)
+
+			for _, repo := range retries {
+				var commits []*github.WeeklyCommitActivity
+				var mods []*github.WeeklyStats
+				var err error
+
+				if commitsMap[repo] == nil {
+					commits, err, _ = GetCommitActivity(ctx, ghClient, *org.Login, repo)
+					if err != nil {
+						log.Printf("Failed to get commit activity for %s. Error: %v\n", repo, err)
+						continue
+					}
+				} else {
+					commits = commitsMap[repo]
+				}
+
+				if modsMap[repo] == nil {
+					mods, err, _ = GetAdditionsDeletions(ctx, ghClient, *org.Login, repo)
+					if err != nil {
+						log.Printf("Failed to get additions/deletions for %s. Error: %v\n", repo, err)
+					}
+				} else {
+					mods = modsMap[repo]
+				}
+
+				saveRepoStats(ctx, fo, *org.Login, repo, commits, mods)
 			}
 		}
 
