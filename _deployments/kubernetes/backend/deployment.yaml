@@ -1,8 +1,10 @@
 kind: Deployment
-apiVersion: apps/v1beta2
+apiVersion: apps/v1
 metadata:
   name: augit
   namespace: solarwindsio
+  labels:
+    app: augit-server
 spec:
   replicas: 1
   selector:
@@ -67,6 +69,18 @@ spec:
                 secretKeyRef:
                   name: augit-db
                   key: url
+            - name: EMAIL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: augit-email
+                  key: password
+            - name: EMAIL_USERNAME
+              value: open@solarwinds.io
+            - name: APPOPTICS_SERVICE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ao-keys
+                  key: augit
           ports:
             - containerPort: 8080
               protocol: TCP
@@ -76,7 +90,7 @@ spec:
               readOnly: true
               mountPath: /config/
           terminationMessagePolicy: File
-          image: 'quay.io/solarwinds/augit-server:latest'
+          image: 'quay.io/solarwinds/augit-server:'
       restartPolicy: Always
       terminationGracePeriodSeconds: 30
       dnsPolicy: ClusterFirst
@@ -84,3 +98,10 @@ spec:
       imagePullSecrets:
         - name: swregcred
       schedulerName: default-scheduler
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 25%
+      maxSurge: 25%
+  revisionHistoryLimit: 10
+  progressDeadlineSeconds: 600
