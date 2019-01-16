@@ -1,0 +1,58 @@
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: cron-patcher
+  namespace: solarwindsio
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: >
+      {"apiVersion":"rbac.authorization.k8s.io/v1","kind":"Role","metadata":{"annotations":{},"name":"cron-patcher","namespace":"solarwindsio"},"rules":[{"apiGroups":["batch"],"resources":["cronjobs"],"verbs":["get","watch","list","patch"]}]}
+rules:
+  - verbs:
+      - get
+      - watch
+      - list
+      - patch
+    apiGroups:
+      - batch
+    resources:
+      - cronjobs
+  - verbs:
+      - get
+      - watch
+      - list
+      - patch
+    apiGroups:
+      - extensions
+    resources:
+      - deployments
+
+==========
+
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: gitlic-check-sa-binding
+  namespace: solarwindsio
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: >
+      {"apiVersion":"rbac.authorization.k8s.io/v1beta1","kind":"RoleBinding","metadata":{"annotations":{},"name":"gitlic-check-sa-binding","namespace":"solarwindsio"},"roleRef":{"apiGroup":"rbac.authorization.k8s.io","kind":"Role","name":"cron-patcher"},"subjects":[{"kind":"ServiceAccount","name":"gitlic-check-patcher"}]}
+subjects:
+  - kind: ServiceAccount
+    name: gitlic-check-patcher
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: cron-patcher
+
+==========
+
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: gitlic-check-patcher
+  namespace: solarwindsio
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: >
+      {"apiVersion":"v1","kind":"ServiceAccount","metadata":{"annotations":{},"name":"gitlic-check-patcher","namespace":"solarwindsio"}}
+secrets:
+  - name: gitlic-check-patcher-token-txk9f
