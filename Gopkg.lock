@@ -168,6 +168,12 @@
   version = "v0.1.0"
 
 [[projects]]
+  name = "github.com/konsorten/go-windows-terminal-sequences"
+  packages = ["."]
+  revision = "5c8c8bd35d3832f5d134ae1e1e375b69a4d25242"
+  version = "v1.0.1"
+
+[[projects]]
   branch = "master"
   name = "github.com/lib/pq"
   packages = [
@@ -244,6 +250,12 @@
   revision = "a683aaf2d516deecd70cad0c72e3ca773ecfcef0"
 
 [[projects]]
+  name = "github.com/sirupsen/logrus"
+  packages = ["."]
+  revision = "e1e72e9de974bd926e5c56f83753fba2df402ce5"
+  version = "v1.3.0"
+
+[[projects]]
   name = "github.com/solarwinds/saml"
   packages = [
     ".",
@@ -274,7 +286,10 @@
 [[projects]]
   branch = "master"
   name = "golang.org/x/crypto"
-  packages = ["ripemd160"]
+  packages = [
+    "ripemd160",
+    "ssh/terminal"
+  ]
   revision = "b47b1587369238182299fe4dad77d05b8b461e06"
 
 [[projects]]
@@ -313,7 +328,10 @@
 [[projects]]
   branch = "master"
   name = "golang.org/x/sys"
-  packages = ["unix"]
+  packages = [
+    "unix",
+    "windows"
+  ]
   revision = "c11f84a56e43e20a78cee75a7c034031ecf57d1f"
 
 [[projects]]
@@ -423,6 +441,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "59f55e881d61973ce11905bf25656332b5dc991f39cb58a81512b24eb8d14ee1"
+  inputs-digest = "5cb712c2a80acc4ff45b3ada7a005f132b53ea49609bd03af921e703b3aad726"
   solver-name = "gps-cdcl"
   solver-version = 1
