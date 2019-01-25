@@ -1,14 +1,40 @@
 version: 2
 jobs:
+  test:
+    working_directory: /go/src/github.com/solarwinds/gitlic-check
+    docker:
+      - image: circleci/golang:1.11
+    steps:
+      - checkout
+      - run: go test ./...
   build:
-    general:
-      branches:
-        only:
-          - staging
-          - master
-    machine:
-      services:
-        - docker
+    machine: true
     steps:
       - checkout
       - run: chmod +x build.sh && ./build.sh
+  deploy:
+    docker:
+      - image: quay.io/solarwinds/gitlic-ci:latest
+        auth:
+          username: $DOCKER_USER
+          password: $DOCKER_PASS
+    steps:
+      - checkout
+      - run: chmod +x deploy.sh && ./deploy.sh
+
+workflows:
+  version: 2
+  build_test_deploy:
+    jobs:
+      - test
+      - build:
+          requires:
+            - test
+      - deploy:
+          requires:
+            - build
+          filters:
+            branches:
+              only:
+                - staging
+                - master
