@@ -4,7 +4,6 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
-	"log"
 	"net/http"
 	"net/url"
 	"os"

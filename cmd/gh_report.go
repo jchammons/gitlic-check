@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"log"
 	"os"
 	"strings"
 
@@ -117,7 +116,7 @@ func purgeOldOwners(ghMembers map[string]bool, ghodb models.GithubOwnerAccessor)
 			if err != nil {
 				return err
 			}
-			log.Printf("Deleted github_owner with ID: %s\n", owner.GithubID)
+			log.Printf("Deleted github_owner with ID: %s", owner.GithubID)
 		}
 	}
 	return nil

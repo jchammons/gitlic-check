@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"errors"
-	"log"
 	"os"
 
 	"github.com/gobuffalo/pop"

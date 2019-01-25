@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"log"
 	"os"
 
 	"github.com/solarwinds/gitlic-check/swgithub"
@@ -36,11 +35,11 @@ func init() {
 var offboardCmd = &cobra.Command{
 	Use: "offboard",
 	Run: func(cmd *cobra.Command, args []string) {
-		log.Println("==========")
-		log.Println("Starting offboard process with these orgs:")
-		log.Printf("%+v\n", orgsToProcess)
-		log.Println("Dry run is:")
-		log.Printf("%+v\n", dryRun)
+		log.Infoln("==========")
+		log.Infoln("Starting offboard process with these orgs:")
+		log.Infof("%+v", orgsToProcess)
+		log.Infoln("Dry run is:")
+		log.Infof("%+v", dryRun)
 		offboard()
 	},
 }
@@ -52,7 +51,7 @@ func offboard() {
 
 	orgs, err := swgithub.GetSWOrgs(context.Background(), client, cf)
 	if err != nil {
-		log.Fatalln(err)
+		log.WithError(err).Fatal("50003: Could not retrieve GitHub orgs")
 	}
 
 	for _, org := range orgs {
@@ -63,14 +62,12 @@ func offboard() {
 		memOpt := &github.ListMembersOptions{ListOptions: *lo}
 		members, err := swgithub.GetOrgMembers(context.Background(), client, org, memOpt)
 		if err != nil {
-			log.Printf("50002: Could not get members for %s, continuing to next org", *org.Login)
-			log.Println(err)
+			log.WithError(err).Errorf("50002: Could not get members for %s, continuing to next org", *org.Login)
 		}
 		for _, memb := range members {
 			err := processMember(memb, client, org)
 			if err != nil {
-				log.Printf("50001: Error processing member %s: %s", memb.GetLogin(), err)
-				log.Println(err)
+				log.WithError(err).Errorf("50001: Error processing member %s: %s", memb.GetLogin(), err)
 			}
 		}
 	}
@@ -88,9 +85,9 @@ func processMember(member *github.User, client *github.Client, org *github.Organ
 		return err
 	}
 	if !exists && !saExists {
-		log.Printf("Did not find registered account for %s in org %s\n", member.GetLogin(), org.GetLogin())
+		log.Infof("Did not find registered account for %s in org %s", member.GetLogin(), org.GetLogin())
 		if !dryRun {
-			log.Printf("Removing %s from %s\n", member.GetLogin(), org.GetLogin())
+			log.Infof("Removing %s from %s", member.GetLogin(), org.GetLogin())
 			_, err := client.Organizations.RemoveOrgMembership(context.Background(), member.GetLogin(), org.GetLogin())
 			if err != nil {
 				return err

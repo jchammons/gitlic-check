@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"os"
 
 	"github.com/solarwinds/gitlic-check/config"
@@ -60,7 +59,7 @@ func run() {
 	}
 
 	if uploadOnly == true && cf.Drive == nil {
-		log.Fatalln("To use the test-upload flag, you must specify the relevant config parameters. See README.\n")
+		log.Fatalln("To use the test-upload flag, you must specify the relevant config parameters. See README.")
 	}
 	filesToOutput := []string{"repos.csv", "users.csv", "invites.csv"}
 	fo := prepareOutput(uploadOnly, filesToOutput)
