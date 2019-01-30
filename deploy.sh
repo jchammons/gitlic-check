@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 set -e
+
+echo "Proceeding with deployment"
+[[ -z "${CIRCLE_TAG}" ]] && tag="$(echo $CIRCLE_SHA1 | cut -c -7)" || tag="${CIRCLE_TAG}"
+echo "Computed tag: $tag"
+
 deploy="false"
 echo "Branch name: $CIRCLE_BRANCH"
 case $CIRCLE_BRANCH in
