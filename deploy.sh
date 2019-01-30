@@ -15,11 +15,10 @@ esac
 if [[ $deploy = "true" ]]; then
     echo "Proceeding with deployment"
     export KUBECONFIG=kubeconfig
-    echo $KUBECONFIG
     kubectl -n solarwindsio set image cronjob gitlic-check-cron gitlic-check=quay.io/solarwinds/gitlic-check:$tag
     kubectl -n solarwindsio set image cronjob augit-gh-report augit-gh-report=quay.io/solarwinds/augit-server:$tag
     kubectl -n solarwindsio set image cronjob augit-populator augit-populator=quay.io/solarwinds/augit-server:$tag
-    kubectl -n solarwindsio set image cronjob augit-gh-offboard-cron augit-populator=quay.io/solarwinds/augit-server:$tag
+    kubectl -n solarwindsio set image cronjob augit-gh-offboard-cron augit-gh-offboard=quay.io/solarwinds/augit-server:$tag
     kubectl -n solarwindsio set image deployment augit augit-server=quay.io/solarwinds/augit-server:$tag
     sleep 5
     response=`kubectl -n solarwindsio rollout status deployments/augit --watch=true`
