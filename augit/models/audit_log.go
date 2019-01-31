@@ -15,7 +15,6 @@ type AuditLog struct {
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 	GithubID  string    `json:"github_id" db:"github_id"`
-	UserID    uuid.UUID `json:"user_id" db:"user_id"`
 }
 
 // String is not required by pop and may be deleted

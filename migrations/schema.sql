@@ -48,6 +48,20 @@ SET default_tablespace = '';
 SET default_with_oids = false;
 
 --
+-- Name: audit_logs; Type: TABLE; Schema: public; Owner: alex
+--
+
+CREATE TABLE public.audit_logs (
+    id uuid NOT NULL,
+    github_id character varying(255) NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL
+);
+
+
+ALTER TABLE public.audit_logs OWNER TO alex;
+
+--
 -- Name: github_owners; Type: TABLE; Schema: public; Owner: alex
 --
 
@@ -106,6 +120,14 @@ CREATE TABLE public.service_accounts (
 
 
 ALTER TABLE public.service_accounts OWNER TO alex;
+
+--
+-- Name: audit_logs audit_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: alex
+--
+
+ALTER TABLE ONLY public.audit_logs
+    ADD CONSTRAINT audit_logs_pkey PRIMARY KEY (id);
+
 
 --
 -- Name: github_owners github_owners_pkey; Type: CONSTRAINT; Schema: public; Owner: alex
