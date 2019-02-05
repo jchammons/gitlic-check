@@ -1,0 +1,4 @@
+create_table("audit_logs", func(t) {
+	t.Column("id", "uuid", {"primary": true})
+	t.Column("github_id", "string", {})
+})

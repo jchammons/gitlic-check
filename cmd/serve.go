@@ -76,11 +76,13 @@ func augitHandlers(tx *pop.Connection) *mux.Router {
 	ghudb := models.NewGithubUserDB(tx)
 	ghodb := models.NewGithubOwnerDB(tx)
 	sadb := models.NewServiceAccountDB(tx)
+	ldb := models.NewAuditLogDB(tx)
 
 	r.Handle("/", http.HandlerFunc(healthCheck())).Methods("GET")
 	r.Handle("/saml/acs", sp)
 	augit.Handle("/user", sp.RequireAccount(http.HandlerFunc(ao.HTTPHandler(handlers.ShowUser(ghudb))))).Methods("GET")
 	augit.Handle("/users", sp.RequireAccount(http.HandlerFunc(ao.HTTPHandler(handlers.ShowAccounts(ghudb, sadb))))).Methods("GET")
+	augit.Handle("/log", sp.RequireAccount(http.HandlerFunc(ao.HTTPHandler(handlers.ShowLog(ldb))))).Methods("GET")
 	augit.Handle("/user", sp.RequireAccount(http.HandlerFunc(ao.HTTPHandler(handlers.AddUser(ghudb))))).Methods("POST")
 	augit.Handle("/service_account", sp.RequireAccount(http.HandlerFunc(ao.HTTPHandler(handlers.AddServiceAccount(ghudb, ghodb, sadb))))).Methods("POST")
 	augit.Handle("/service_account", sp.RequireAccount(http.HandlerFunc(ao.HTTPHandler(handlers.RemoveServiceAccount(ghudb, sadb, ghodb))))).Methods("DELETE")
