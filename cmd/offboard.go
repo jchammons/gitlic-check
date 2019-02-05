@@ -8,6 +8,7 @@ import (
 
 	"github.com/gobuffalo/pop"
 	"github.com/google/go-github/github"
+	"github.com/sirupsen/logrus"
 	"github.com/solarwinds/gitlic-check/augit/models"
 	"github.com/solarwinds/gitlic-check/config"
 	"github.com/spf13/cobra"
@@ -91,6 +92,15 @@ func processMember(member *github.User, client *github.Client, org *github.Organ
 			_, err := client.Organizations.RemoveOrgMembership(context.Background(), member.GetLogin(), org.GetLogin())
 			if err != nil {
 				return err
+			}
+			al := &models.AuditLog{
+				GithubID: member.GetLogin(),
+			}
+			vErr, err := al.ValidateCreate(db)
+			if vErr != nil {
+				log.WithFields(logrus.Fields{
+					"github_id": member.GetLogin(),
+				}).Warn("Could not create entry in audit log table")
 			}
 		}
 	}
