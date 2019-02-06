@@ -41,11 +41,12 @@ var offboardCmd = &cobra.Command{
 		log.Infof("%+v", orgsToProcess)
 		log.Infoln("Dry run is:")
 		log.Infof("%+v", dryRun)
-		offboard()
+		aldb := models.NewAuditLogDB(db)
+		offboard(aldb)
 	},
 }
 
-func offboard() {
+func offboard(aldb models.AuditLogAccessor) {
 	cf := config.GetConfig()
 	client := github.NewClient(
 		oauth2.NewClient(context.Background(), oauth2.StaticTokenSource(&oauth2.Token{AccessToken: cf.Github.Token})))
@@ -66,7 +67,7 @@ func offboard() {
 			log.WithError(err).Errorf("50002: Could not get members for %s, continuing to next org", *org.Login)
 		}
 		for _, memb := range members {
-			err := processMember(memb, client, org)
+			err := processMember(memb, client, org, aldb)
 			if err != nil {
 				log.WithError(err).Errorf("50001: Error processing member %s: %s", memb.GetLogin(), err)
 			}
@@ -74,7 +75,7 @@ func offboard() {
 	}
 }
 
-func processMember(member *github.User, client *github.Client, org *github.Organization) error {
+func processMember(member *github.User, client *github.Client, org *github.Organization, aldb models.AuditLogAccessor) error {
 	swiUser := &models.GithubUser{}
 	sa := &models.ServiceAccount{}
 	exists, err := db.Where("(LOWER(github_id) = LOWER(?) AND username != '') OR (LOWER(github_id) = LOWER(?) AND email != '')", member.GetLogin(), member.GetLogin()).Exists(swiUser)
@@ -96,9 +97,9 @@ func processMember(member *github.User, client *github.Client, org *github.Organ
 			al := &models.AuditLog{
 				GithubID: member.GetLogin(),
 			}
-			vErr, err := al.ValidateCreate(db)
-			if vErr != nil {
-				log.WithFields(logrus.Fields{
+			err = aldb.Create(al)
+			if err != nil {
+				log.WithError(err).WithFields(logrus.Fields{
 					"github_id": member.GetLogin(),
 				}).Warn("Could not create entry in audit log table")
 			}
