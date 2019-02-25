@@ -233,10 +233,17 @@ func AddServiceAccount(ghudb models.GithubUserAccessor, ghodb models.GithubOwner
 			AdminResponsible: user.ID,
 		}
 		exists, err := sadb.Exists(req.GithubID)
+		if err != nil {
+			log.Printf("Failed to verify GitHub ID for service account is not already registered. Error: %v\n", err)
+			errPayload := augit.LogAndFormatError(ERR_DB_RETRIEVAL, "Could not verify GitHub ID's current registration status")
+			w.WriteHeader(http.StatusBadGateway)
+			w.Write(errPayload)
+			return
+		}
 		if !exists {
 			// Check to ensure GH id is not already associated with a SW user
 			ghEntry, err := ghudb.FindByGithubID(req.GithubID)
-			if err != nil {
+			if err != nil && !models.IsErrRecordNotFound(err) {
 				log.Printf("Failed to verify GitHub ID for service account is not already registered. Error: %v\n", err)
 				errPayload := augit.LogAndFormatError(ERR_DB_RETRIEVAL, "Could not verify GitHub ID's current registration status")
 				w.WriteHeader(http.StatusBadGateway)
