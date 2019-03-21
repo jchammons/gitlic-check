@@ -53,6 +53,7 @@ var offboardCmd = &cobra.Command{
 		log.Infof("%+v", dryRun)
 		aldb := models.NewAuditLogDB(db)
 		offboard(aldb)
+		log.Info(generateSuccessString("offboard"))
 		_, err := mService.Create(ao.NewMeasurementsBatch([]ao.Measurement{measurement}, nil))
 		if err != nil {
 			log.Fatalln(err)

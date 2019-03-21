@@ -1,11 +1,12 @@
 package cmd
 
 import (
-	"fmt"
-
 	"errors"
+	"fmt"
 	"os"
+	"time"
 
+	ao "github.com/appoptics/appoptics-api-go"
 	"github.com/gobuffalo/pop"
 	"github.com/solarwinds/gitlic-check/augit/models"
 	swio "github.com/solarwinds/swio-users"
@@ -17,7 +18,21 @@ var populateCmd = &cobra.Command{
 	Use:   "populate",
 	Short: "populate is the command used to populate a local Augit database with users from Azure AD",
 	Run: func(cmd *cobra.Command, args []string) {
+		aoToken := os.Getenv("AO_TOKEN")
+		aoClient := ao.NewClient(aoToken)
+		mService := aoClient.MeasurementsService()
+		measurement := ao.Measurement{
+			Name:  "augit.populate.runs",
+			Value: 1,
+			Time:  time.Now().Unix(),
+			Tags:  map[string]string{"environment": os.Getenv("ENVIRONMENT")},
+		}
 		err := PopulateDomainUsers()
+		if err != nil {
+			log.Fatalln(err)
+		}
+		log.Info(generateSuccessString("populate"))
+		_, err = mService.Create(ao.NewMeasurementsBatch([]ao.Measurement{measurement}, nil))
 		if err != nil {
 			log.Fatalln(err)
 		}

@@ -24,3 +24,7 @@ func Execute() {
 func RegisterLogger(lgr *logrus.Logger) {
 	log = lgr
 }
+
+func generateSuccessString(cmdName string) string {
+	return fmt.Sprintf("100 : %s Cron Success", cmdName)
+}

@@ -40,6 +40,7 @@ var ghReportCmd = &cobra.Command{
 		if err != nil {
 			log.Fatalln(err)
 		}
+		log.Info(generateSuccessString("gh-report"))
 		_, err = mService.Create(ao.NewMeasurementsBatch([]ao.Measurement{measurement}, nil))
 		if err != nil {
 			log.Fatalln(err)
