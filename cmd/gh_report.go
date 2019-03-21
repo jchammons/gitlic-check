@@ -4,7 +4,9 @@ import (
 	"context"
 	"os"
 	"strings"
+	"time"
 
+	ao "github.com/appoptics/appoptics-api-go"
 	"github.com/gobuffalo/pop"
 	"github.com/google/go-github/github"
 	"github.com/solarwinds/gitlic-check/augit/models"
@@ -18,6 +20,15 @@ var ghReportCmd = &cobra.Command{
 	Use:   "gh-report",
 	Short: "gh-report generates and persists a list of GH users in SolarWinds organizations",
 	Run: func(cmd *cobra.Command, args []string) {
+		aoToken := os.Getenv("AO_TOKEN")
+		aoClient := ao.NewClient(aoToken)
+		mService := aoClient.MeasurementsService()
+		measurement := ao.Measurement{
+			Name:  "augit.gh-report.runs",
+			Value: 1,
+			Time:  time.Now().Unix(),
+			Tags:  map[string]string{"environment": os.Getenv("ENVIRONMENT")},
+		}
 		cxn, err := pop.Connect(os.Getenv("ENVIRONMENT"))
 		if err != nil {
 			log.Fatal(err)
@@ -26,6 +37,10 @@ var ghReportCmd = &cobra.Command{
 		ghodb := models.NewGithubOwnerDB(cxn)
 		sadb := models.NewServiceAccountDB(cxn)
 		err = persistUsers(ghudb, ghodb, sadb)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		_, err = mService.Create(ao.NewMeasurementsBatch([]ao.Measurement{measurement}, nil))
 		if err != nil {
 			log.Fatalln(err)
 		}

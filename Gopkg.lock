@@ -8,6 +8,12 @@
   version = "v0.20.0"
 
 [[projects]]
+  name = "github.com/appoptics/appoptics-api-go"
+  packages = ["."]
+  revision = "2cbca4f36e0f89e937e8df33ca131173b7bb77c2"
+  version = "0.2.3"
+
+[[projects]]
   name = "github.com/appoptics/appoptics-apm-go"
   packages = [
     "v1/ao",
@@ -441,6 +447,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "5cb712c2a80acc4ff45b3ada7a005f132b53ea49609bd03af921e703b3aad726"
+  inputs-digest = "9cb390a0d3337f3dc3932cf691ac91cc8c5766d19798cfc350bd6fa6749b8320"
   solver-name = "gps-cdcl"
   solver-version = 1
