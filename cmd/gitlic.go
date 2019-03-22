@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 
+	ao "github.com/appoptics/appoptics-api-go"
 	"github.com/solarwinds/gitlic-check/config"
 	"github.com/solarwinds/gitlic-check/gitlic"
 	"github.com/solarwinds/gitlic-check/swgithub"
@@ -26,7 +28,21 @@ func init() {
 var gitlicCmd = &cobra.Command{
 	Use: "gitlic",
 	Run: func(cmd *cobra.Command, args []string) {
+		aoToken := os.Getenv("AO_TOKEN")
+		aoClient := ao.NewClient(aoToken)
+		mService := aoClient.MeasurementsService()
+		measurement := ao.Measurement{
+			Name:  "augit.gitlic.runs",
+			Value: 1,
+			Time:  time.Now().Unix(),
+			Tags:  map[string]string{"environment": os.Getenv("ENVIRONMENT")},
+		}
 		run()
+		log.Info(generateSuccessString("gitlic"))
+		_, err := mService.Create(ao.NewMeasurementsBatch([]ao.Measurement{measurement}, nil))
+		if err != nil {
+			log.Fatalln(err)
+		}
 	},
 }
 
