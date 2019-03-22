@@ -3,14 +3,15 @@ package cmd
 import (
 	"context"
 	"os"
+	"time"
 
-	"github.com/solarwinds/gitlic-check/swgithub"
-
+	ao "github.com/appoptics/appoptics-api-go"
 	"github.com/gobuffalo/pop"
 	"github.com/google/go-github/github"
 	"github.com/sirupsen/logrus"
 	"github.com/solarwinds/gitlic-check/augit/models"
 	"github.com/solarwinds/gitlic-check/config"
+	"github.com/solarwinds/gitlic-check/swgithub"
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2"
 )
@@ -36,6 +37,15 @@ func init() {
 var offboardCmd = &cobra.Command{
 	Use: "offboard",
 	Run: func(cmd *cobra.Command, args []string) {
+		aoToken := os.Getenv("AO_TOKEN")
+		aoClient := ao.NewClient(aoToken)
+		mService := aoClient.MeasurementsService()
+		measurement := ao.Measurement{
+			Name:  "augit.offboard.runs",
+			Value: 1,
+			Time:  time.Now().Unix(),
+			Tags:  map[string]string{"environment": os.Getenv("ENVIRONMENT")},
+		}
 		log.Infoln("==========")
 		log.Infoln("Starting offboard process with these orgs:")
 		log.Infof("%+v", orgsToProcess)
@@ -43,6 +53,11 @@ var offboardCmd = &cobra.Command{
 		log.Infof("%+v", dryRun)
 		aldb := models.NewAuditLogDB(db)
 		offboard(aldb)
+		log.Info(generateSuccessString("offboard"))
+		_, err := mService.Create(ao.NewMeasurementsBatch([]ao.Measurement{measurement}, nil))
+		if err != nil {
+			log.Fatalln(err)
+		}
 	},
 }
 

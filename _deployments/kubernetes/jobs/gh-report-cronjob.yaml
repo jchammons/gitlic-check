@@ -45,6 +45,11 @@ spec:
                     secretKeyRef:
                       name: augit-ad
                       key: secret
+                - name: AO_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: ao-keys
+                      key: generic
               imagePullPolicy: Always
               volumeMounts:
                 - name: config
