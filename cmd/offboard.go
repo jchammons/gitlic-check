@@ -68,7 +68,7 @@ func offboard(aldb models.AuditLogAccessor) {
 
 	orgs, err := swgithub.GetSWOrgs(context.Background(), client, cf)
 	if err != nil {
-		log.WithError(err).Fatal("50003: Could not retrieve GitHub orgs")
+		log.WithError(err).Fatal("50011: Could not retrieve GitHub orgs")
 	}
 
 	for _, org := range orgs {

@@ -65,6 +65,7 @@ func persistUsers(ghudb models.GithubUserAccessor, ghodb models.GithubOwnerAcces
 	ghClient := github.NewClient(oauth2.NewClient(ctx, oauth2.StaticTokenSource(&oauth2.Token{AccessToken: cf.Github.Token})))
 	orgs, err := swgithub.GetSWOrgs(ctx, ghClient, cf)
 	if err != nil {
+		log.WithError(err).Fatal("50011: Could not retrieve GitHub orgs")
 		return err
 	}
 	allMembers := []*github.User{}
