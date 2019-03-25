@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"time"
 
@@ -54,8 +55,9 @@ var offboardCmd = &cobra.Command{
 		aldb := models.NewAuditLogDB(db)
 		offboard(aldb)
 		log.Info(generateSuccessString("offboard"))
-		_, err := mService.Create(ao.NewMeasurementsBatch([]ao.Measurement{measurement}, nil))
-		if err != nil {
+		resp, err := mService.Create(ao.NewMeasurementsBatch([]ao.Measurement{measurement}, nil))
+		log.Info(fmt.Sprintf("Response creating AO measurement %d", resp.StatusCode))
+		if err != nil || resp.StatusCode >= 400 {
 			log.Fatalln(err)
 		}
 	},
@@ -68,7 +70,7 @@ func offboard(aldb models.AuditLogAccessor) {
 
 	orgs, err := swgithub.GetSWOrgs(context.Background(), client, cf)
 	if err != nil {
-		log.WithError(err).Fatal("50003: Could not retrieve GitHub orgs")
+		log.WithError(err).Fatal("50011: Could not retrieve GitHub orgs")
 	}
 
 	for _, org := range orgs {
