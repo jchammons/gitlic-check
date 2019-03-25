@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -41,8 +42,9 @@ var ghReportCmd = &cobra.Command{
 			log.Fatalln(err)
 		}
 		log.Info(generateSuccessString("gh-report"))
-		_, err = mService.Create(ao.NewMeasurementsBatch([]ao.Measurement{measurement}, nil))
-		if err != nil {
+		resp, err := mService.Create(ao.NewMeasurementsBatch([]ao.Measurement{measurement}, nil))
+		log.Info(fmt.Sprintf("Response creating AO measurement %d", resp.StatusCode))
+		if err != nil || resp.StatusCode >= 400 {
 			log.Fatalln(err)
 		}
 	},
@@ -65,6 +67,7 @@ func persistUsers(ghudb models.GithubUserAccessor, ghodb models.GithubOwnerAcces
 	ghClient := github.NewClient(oauth2.NewClient(ctx, oauth2.StaticTokenSource(&oauth2.Token{AccessToken: cf.Github.Token})))
 	orgs, err := swgithub.GetSWOrgs(ctx, ghClient, cf)
 	if err != nil {
+		log.WithError(err).Fatal("50011: Could not retrieve GitHub orgs")
 		return err
 	}
 	allMembers := []*github.User{}

@@ -32,8 +32,9 @@ var populateCmd = &cobra.Command{
 			log.Fatalln(err)
 		}
 		log.Info(generateSuccessString("populate"))
-		_, err = mService.Create(ao.NewMeasurementsBatch([]ao.Measurement{measurement}, nil))
-		if err != nil {
+		resp, err := mService.Create(ao.NewMeasurementsBatch([]ao.Measurement{measurement}, nil))
+		log.Info(fmt.Sprintf("Response creating AO measurement %d", resp.StatusCode))
+		if err != nil || resp.StatusCode >= 400 {
 			log.Fatalln(err)
 		}
 	},
