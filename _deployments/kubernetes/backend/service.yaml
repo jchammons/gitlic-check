@@ -11,3 +11,10 @@ spec:
       protocol: TCP
       port: 8080
       targetPort: 8080
+  selector:
+    app: augit-server
+  clusterIP: 10.101.228.86
+  type: ClusterIP
+  sessionAffinity: None
+status:
+  loadBalancer: {}

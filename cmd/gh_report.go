@@ -2,10 +2,12 @@ package cmd
 
 import (
 	"context"
-	"log"
+	"fmt"
 	"os"
 	"strings"
+	"time"
 
+	ao "github.com/appoptics/appoptics-api-go"
 	"github.com/gobuffalo/pop"
 	"github.com/google/go-github/github"
 	"github.com/solarwinds/gitlic-check/augit/models"
@@ -19,6 +21,15 @@ var ghReportCmd = &cobra.Command{
 	Use:   "gh-report",
 	Short: "gh-report generates and persists a list of GH users in SolarWinds organizations",
 	Run: func(cmd *cobra.Command, args []string) {
+		aoToken := os.Getenv("AO_TOKEN")
+		aoClient := ao.NewClient(aoToken)
+		mService := aoClient.MeasurementsService()
+		measurement := ao.Measurement{
+			Name:  "augit.gh-report.runs",
+			Value: 1,
+			Time:  time.Now().Unix(),
+			Tags:  map[string]string{"environment": os.Getenv("ENVIRONMENT")},
+		}
 		cxn, err := pop.Connect(os.Getenv("ENVIRONMENT"))
 		if err != nil {
 			log.Fatal(err)
@@ -28,6 +39,12 @@ var ghReportCmd = &cobra.Command{
 		sadb := models.NewServiceAccountDB(cxn)
 		err = persistUsers(ghudb, ghodb, sadb)
 		if err != nil {
+			log.Fatalln(err)
+		}
+		log.Info(generateSuccessString("gh-report"))
+		resp, err := mService.Create(ao.NewMeasurementsBatch([]ao.Measurement{measurement}, nil))
+		log.Info(fmt.Sprintf("Response creating AO measurement %d", resp.StatusCode))
+		if err != nil || resp.StatusCode >= 400 {
 			log.Fatalln(err)
 		}
 	},
@@ -50,6 +67,7 @@ func persistUsers(ghudb models.GithubUserAccessor, ghodb models.GithubOwnerAcces
 	ghClient := github.NewClient(oauth2.NewClient(ctx, oauth2.StaticTokenSource(&oauth2.Token{AccessToken: cf.Github.Token})))
 	orgs, err := swgithub.GetSWOrgs(ctx, ghClient, cf)
 	if err != nil {
+		log.WithError(err).Fatal("50011: Could not retrieve GitHub orgs")
 		return err
 	}
 	allMembers := []*github.User{}
@@ -82,12 +100,6 @@ func persistUsers(ghudb models.GithubUserAccessor, ghodb models.GithubOwnerAcces
 		return err
 	}
 
-	ghMembers := generateMembersMap(allMembers)
-	err = purgeOldUsers(ghMembers, ghudb, sadb)
-	if err != nil {
-		return err
-	}
-
 	allOwnerUsers := []*github.User{}
 	for _, org := range allOwners {
 		allOwnerUsers = append(allOwnerUsers, org.owners...)
@@ -115,29 +127,15 @@ func generateMembersMap(members []*github.User) map[string]bool {
 	return newMap
 }
 
-func purgeOldUsers(ghMembers map[string]bool, ghudb models.GithubUserAccessor, sadb models.ServiceAccountAccessor) error {
-	existingUsers, err := ghudb.ListGHUsers()
-	for _, user := range existingUsers {
-		if _, ok := ghMembers[strings.ToLower(user.GithubID)]; !ok {
-			err = ghudb.Delete(user.GithubID)
-			if err != nil {
-				return err
-			}
-			log.Printf("Deleted github_user with ID: %s\n", user.GithubID)
-		}
-	}
-	return nil
-}
-
 func purgeOldOwners(ghMembers map[string]bool, ghodb models.GithubOwnerAccessor) error {
 	existingOwners, err := ghodb.List()
 	for _, owner := range existingOwners {
-		if _, ok := ghMembers[owner.GithubID]; !ok {
+		if _, ok := ghMembers[strings.ToLower(owner.GithubID)]; !ok {
 			err = ghodb.Delete(owner.GithubID)
 			if err != nil {
 				return err
 			}
-			log.Printf("Deleted github_owner with ID: %s\n", owner.GithubID)
+			log.Printf("Deleted github_owner with ID: %s", owner.GithubID)
 		}
 	}
 	return nil

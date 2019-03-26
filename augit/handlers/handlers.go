@@ -120,6 +120,34 @@ func ShowAccounts(ghudb models.GithubUserAccessor, sadb models.ServiceAccountAcc
 	}
 }
 
+func ShowLog(ldb models.AuditLogAccessor) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		type logResponse struct {
+			Entries []*models.AuditLog `json:"entries"`
+		}
+		entries, err := ldb.List()
+		if err != nil {
+			log.Printf("Failed to find audit log entries. Error: %v\n", err)
+			errPayload := augit.LogAndFormatError(ERR_DB_RETRIEVAL, "Could not find audit log entries")
+			w.WriteHeader(http.StatusBadGateway)
+			w.Write(errPayload)
+			return
+		}
+		resp := &logResponse{entries}
+		marshaledEntries, err := json.Marshal(resp)
+		if err != nil {
+			log.Printf("Failed to marshall audit log data. Error: %v\n", err)
+			errPayload := augit.LogAndFormatError(ERR_MARSHAL_DATA, "Could not marshal response")
+			w.WriteHeader(http.StatusBadGateway)
+			w.Write(errPayload)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(marshaledEntries)
+	}
+}
+
 type ghRequest struct {
 	GithubID string `json:"github_id"`
 }
@@ -205,10 +233,17 @@ func AddServiceAccount(ghudb models.GithubUserAccessor, ghodb models.GithubOwner
 			AdminResponsible: user.ID,
 		}
 		exists, err := sadb.Exists(req.GithubID)
+		if err != nil {
+			log.Printf("Failed to verify GitHub ID for service account is not already registered. Error: %v\n", err)
+			errPayload := augit.LogAndFormatError(ERR_DB_RETRIEVAL, "Could not verify GitHub ID's current registration status")
+			w.WriteHeader(http.StatusBadGateway)
+			w.Write(errPayload)
+			return
+		}
 		if !exists {
 			// Check to ensure GH id is not already associated with a SW user
 			ghEntry, err := ghudb.FindByGithubID(req.GithubID)
-			if err != nil {
+			if err != nil && !models.IsErrRecordNotFound(err) {
 				log.Printf("Failed to verify GitHub ID for service account is not already registered. Error: %v\n", err)
 				errPayload := augit.LogAndFormatError(ERR_DB_RETRIEVAL, "Could not verify GitHub ID's current registration status")
 				w.WriteHeader(http.StatusBadGateway)

@@ -1,12 +1,12 @@
 package cmd
 
 import (
-	"fmt"
-
 	"errors"
-	"log"
+	"fmt"
 	"os"
+	"time"
 
+	ao "github.com/appoptics/appoptics-api-go"
 	"github.com/gobuffalo/pop"
 	"github.com/solarwinds/gitlic-check/augit/models"
 	swio "github.com/solarwinds/swio-users"
@@ -18,8 +18,23 @@ var populateCmd = &cobra.Command{
 	Use:   "populate",
 	Short: "populate is the command used to populate a local Augit database with users from Azure AD",
 	Run: func(cmd *cobra.Command, args []string) {
+		aoToken := os.Getenv("AO_TOKEN")
+		aoClient := ao.NewClient(aoToken)
+		mService := aoClient.MeasurementsService()
+		measurement := ao.Measurement{
+			Name:  "augit.populate.runs",
+			Value: 1,
+			Time:  time.Now().Unix(),
+			Tags:  map[string]string{"environment": os.Getenv("ENVIRONMENT")},
+		}
 		err := PopulateDomainUsers()
 		if err != nil {
+			log.Fatalln(err)
+		}
+		log.Info(generateSuccessString("populate"))
+		resp, err := mService.Create(ao.NewMeasurementsBatch([]ao.Measurement{measurement}, nil))
+		log.Info(fmt.Sprintf("Response creating AO measurement %d", resp.StatusCode))
+		if err != nil || resp.StatusCode >= 400 {
 			log.Fatalln(err)
 		}
 	},
@@ -31,7 +46,6 @@ type AugitDB struct {
 
 func (adb *AugitDB) Create(inUser *swio.User) error {
 	if !inUser.Enabled {
-		fmt.Printf("skipping or deleting %s for being disabled\n", inUser.Username)
 		// Delete disabled users, so that the offboarding command can check for users existing within the
 		// Augit DB associated w/ every GH user
 		err := adb.checkForDeletion(inUser)
@@ -118,6 +132,8 @@ func PopulateDomainUsers() error {
 			if err != nil {
 				// TODO: Create error type for array of errors to keep track of failures
 				fmt.Printf("[ERROR] skipping user: %+v\n", user)
+				fmt.Println(err)
+				fmt.Println("=====")
 			}
 		}
 	}

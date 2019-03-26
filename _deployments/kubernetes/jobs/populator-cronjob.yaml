@@ -1,0 +1,68 @@
+kind: CronJob
+apiVersion: batch/v1beta1
+metadata:
+  name: augit-populator
+  namespace: solarwindsio
+spec:
+  schedule: 0 1 * * *
+  concurrencyPolicy: Allow
+  suspend: false
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          volumes:
+            - name: config
+              secret:
+                secretName: gitlic-config
+                defaultMode: 420
+          containers:
+            - resources:
+                limits:
+                  memory: 1Gi
+                requests:
+                  memory: 1Gi
+              terminationMessagePath: /dev/termination-log
+              name: augit-populator
+              command:
+                - /bin/gitlic
+                - populate
+              env:
+                - name: ENVIRONMENT
+                  value: production
+                - name: DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: augit-db
+                      key: url
+                - name: AD_CLIENT_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: augit-ad
+                      key: id
+                - name: AD_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: augit-ad
+                      key: secret
+                - name: AO_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: ao-keys
+                      key: generic
+              imagePullPolicy: Always
+              volumeMounts:
+                - name: config
+                  readOnly: true
+                  mountPath: /config/
+              terminationMessagePolicy: File
+              image: 'quay.io/solarwinds/augit-server:'
+          restartPolicy: Never
+          terminationGracePeriodSeconds: 30
+          dnsPolicy: ClusterFirst
+          securityContext: {}
+          imagePullSecrets:
+            - name: swregcred
+          schedulerName: default-scheduler
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
