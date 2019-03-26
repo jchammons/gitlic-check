@@ -7,7 +7,13 @@ import (
 
 	"github.com/google/go-github/github"
 	"github.com/solarwinds/gitlic-check/config"
+	"golang.org/x/oauth2"
 )
+
+// GetGHClient returns a client to interact with the GitHub API
+func GetGHClient(ctx context.Context, cf config.Config) *github.Client {
+	return github.NewClient(oauth2.NewClient(ctx, oauth2.StaticTokenSource(&oauth2.Token{AccessToken: cf.Github.Token})))
+}
 
 func GetSWOrgs(ctx context.Context, ghClient *github.Client, cf config.Config) ([]*github.Organization, error) {
 	includedOrgs := getIncludedMap(cf.Github.IncludedOrgs)

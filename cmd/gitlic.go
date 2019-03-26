@@ -15,13 +15,15 @@ import (
 )
 
 var (
-	uploadOnly bool
-	noUpload   bool
+	uploadOnly  bool
+	noUpload    bool
+	statsReport bool
 )
 
 func init() {
 	gitlicCmd.Flags().BoolVar(&uploadOnly, "upload-only", false, "test upload only; skip GitHub check")
 	gitlicCmd.Flags().BoolVar(&noUpload, "no-upload", false, "test/re-run GitHub check only; skip upload")
+	gitlicCmd.Flags().BoolVar(&statsReport, "stats", false, "run a stats report instead of standard Gitlic")
 	rootCmd.AddCommand(gitlicCmd)
 }
 
@@ -74,10 +76,16 @@ func run() {
 		log.Fatalf("Failed to get working directory. Error: %v\n", err)
 	}
 
-	if uploadOnly == true && cf.Drive == nil {
+	if uploadOnly && cf.Drive == nil {
 		log.Fatalln("To use the test-upload flag, you must specify the relevant config parameters. See README.")
 	}
-	filesToOutput := []string{"repos.csv", "stats.csv", "users.csv", "invites.csv"}
+
+	var filesToOutput []string
+	if statsReport {
+		filesToOutput = []string{"stats.csv"}
+	} else {
+		filesToOutput = []string{"repos.csv", "users.csv", "invites.csv"}
+	}
 	fo := prepareOutput(uploadOnly, filesToOutput)
 	defer func() {
 		for _, file := range fo {
@@ -87,8 +95,12 @@ func run() {
 		}
 	}()
 
-	if uploadOnly == false {
-		swgithub.RunGitlicCheck(ctx, cf, fo)
+	if !uploadOnly {
+		if statsReport {
+			swgithub.RunGitlicStatsReport(ctx, cf, fo)
+		} else {
+			swgithub.RunGitlicCheck(ctx, cf, fo)
+		}
 		for _, file := range fo {
 			if _, err = file.Seek(0, io.SeekStart); err != nil {
 				log.Fatal(err)
@@ -96,7 +108,7 @@ func run() {
 		}
 	}
 
-	if noUpload == false && cf.Drive != nil {
+	if !noUpload && cf.Drive != nil {
 		gitlic.UploadToDrive(ctx, cf, wd, fo)
 	}
 }

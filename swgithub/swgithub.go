@@ -10,10 +10,7 @@ import (
 
 	"github.com/google/go-github/github"
 	"github.com/solarwinds/gitlic-check/config"
-	"golang.org/x/oauth2"
 )
-
-var weekdays [7]string
 
 // getIncludedMap will turn the array of included orgs from the config file into a map that is easy to check against as we iterate over organizations returned from the GitHub API
 func getIncludedMap(a []string) map[string]bool {
@@ -24,84 +21,15 @@ func getIncludedMap(a []string) map[string]bool {
 	return includedOrgs
 }
 
-func saveRepoStats(ctx context.Context, fo map[string]*os.File, org string, repo string, commits []*github.WeeklyCommitActivity, mods []*github.WeeklyStats) {
-	totalCommits := 0
-	linesAdded := 0
-	linesRemoved := 0
-	mostCommitsOneDay := 0
-	mostCommitsOneWeek := 0
-	var mostCommittable string
-	highestDayCounts := map[string]int{"Sunday": 0, "Monday": 0, "Tuesday": 0, "Wednesday": 0, "Thursday": 0, "Friday": 0, "Saturday": 0}
-
-	for _, commit := range commits {
-		totalCommits += *commit.Total
-
-		if *commit.Total > 0 {
-			highestDay := 0
-			highestDayInd := 0
-			weekTotal := 0
-			for i, dayTotal := range commit.Days {
-				weekTotal += dayTotal
-
-				if dayTotal > highestDay {
-					highestDayInd = i
-				}
-				if dayTotal > mostCommitsOneDay {
-					mostCommitsOneDay = dayTotal
-				}
-			}
-			highestDayCounts[weekdays[highestDayInd]]++
-			if weekTotal > mostCommitsOneWeek {
-				mostCommitsOneWeek = weekTotal
-			}
-		}
-	}
-
-	if totalCommits > 0 {
-		highestCount := 0
-		for day, count := range highestDayCounts {
-			if count > highestCount {
-				mostCommittable = day
-			}
-		}
-	} else {
-		mostCommittable = "N/A"
-	}
-
-	mostLinesAddedOneWeek := 0
-	mostLinesRemovedOneWeek := 0
-	for _, mod := range mods {
-		linesAdded += *mod.Additions
-		linesRemoved += *mod.Deletions
-
-		if *mod.Additions > mostLinesAddedOneWeek {
-			mostLinesAddedOneWeek = *mod.Additions
-		}
-
-		if *mod.Deletions < mostLinesRemovedOneWeek {
-			mostLinesRemovedOneWeek = *mod.Deletions
-		}
-	}
-
-	fo["stats.csv"].WriteString(fmt.Sprint(org, ",", repo, ",", totalCommits, ",", mostCommitsOneDay, ",", mostCommitsOneWeek, ",", mostCommittable, ",", linesAdded, ",", linesRemoved, ",", mostLinesAddedOneWeek, ",", mostLinesRemovedOneWeek, "\n"))
-
-	return
-}
-
 // RunGitlicCheck begins the process of querying the GitHub API. It will loop through your organizations and their repositories and pull info on configuration, license, and users, including invitations. It will output the results to respective CSV files in the output folder. See the README for an idea of what these CSV reports contain.
 func RunGitlicCheck(ctx context.Context, cf config.Config, fo map[string]*os.File) {
-	weekdays = [7]string{"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"}
-	ghClient := github.NewClient(oauth2.NewClient(ctx, oauth2.StaticTokenSource(&oauth2.Token{AccessToken: cf.Github.Token})))
+	ghClient := GetGHClient(ctx, cf)
 	lo := &github.ListOptions{PerPage: 100}
 	maxInviteT := time.Duration(cf.Github.RmInvitesAfter) * time.Hour
 
 	log.Print("Working...\n\n")
 
 	if _, err := fo["repos.csv"].WriteString("Org,Repo,Private,Fork,License\n"); err != nil {
-		log.Printf("Initial save to repos CSV failed with %s\n", err)
-	}
-
-	if _, err := fo["stats.csv"].WriteString("Org,Repo,Commits in Last Year,Most Commits in a Day,Most Commits in a Week,Most Committable Day,Total Lines Added,Total Lines Removed,Most Lines Added in a Week,Most Lines Removed in a Week\n"); err != nil {
 		log.Printf("Initial save to repos CSV failed with %s\n", err)
 	}
 
@@ -115,7 +43,7 @@ func RunGitlicCheck(ctx context.Context, cf config.Config, fo map[string]*os.Fil
 
 	orgs, err := GetSWOrgs(ctx, ghClient, cf)
 	if err != nil {
-		log.Printf("Failed to get orgs: %s", err.Error())
+		log.Fatalf("Failed to get orgs: %s", err.Error())
 		return
 	}
 
@@ -152,77 +80,13 @@ func RunGitlicCheck(ctx context.Context, cf config.Config, fo map[string]*os.Fil
 			return
 		}
 
-		var retries []string
-		commitsMap := make(map[string][]*github.WeeklyCommitActivity)
-		modsMap := make(map[string][]*github.WeeklyStats)
-
 		for _, repo := range repos {
-			if _, err := fo["repos.csv"].WriteString(fmt.Sprint(*org.Login, ",", *repo.Name, ",", *repo.Private, ",", *repo.Fork, ",")); err != nil {
+			license := "None"
+			if repo.License.GetName() != "" {
+				license = repo.License.GetName()
+			}
+			if _, err := fo["repos.csv"].WriteString(fmt.Sprint(*org.Login, ",", *repo.Name, ",", *repo.Private, ",", *repo.Fork, ",", license, "\n")); err != nil {
 				log.Printf("Failed to write to repos.csv on %s with %s\n", *org.Login, err)
-			}
-
-			lics, _, err := ghClient.Repositories.License(ctx, *repo.Owner.Login, *repo.Name)
-			if err != nil {
-				fo["repos.csv"].WriteString("None\n")
-			} else {
-				if _, err = fo["repos.csv"].WriteString(fmt.Sprint(*lics.License.Name, "\n")); err != nil {
-					log.Printf("Failed to write to repos.csv on %s with %s\n", *org.Login, err)
-				}
-			}
-
-			commits, err, cmRetry := GetCommitActivity(ctx, ghClient, *org.Login, *repo.Name)
-			if err != nil {
-				log.Printf("Failed to get commit activity for %s. Error: %v\n", *repo.Name, err)
-			} else {
-				mods, err, mdRetry := GetAdditionsDeletions(ctx, ghClient, *org.Login, *repo.Name)
-				if err != nil {
-					log.Printf("Failed to get additions/deletions for %s. Error: %v\n", *repo.Name, err)
-				}
-
-				if cmRetry || mdRetry {
-					retries = append(retries, *repo.Name)
-
-					if !cmRetry {
-						commitsMap[*repo.Name] = commits
-					}
-					if !mdRetry {
-						modsMap[*repo.Name] = mods
-					}
-					continue
-				}
-
-				saveRepoStats(ctx, fo, *org.Login, *repo.Name, commits, mods)
-			}
-		}
-
-		if len(retries) > 0 {
-			time.Sleep(3000 * time.Millisecond)
-
-			for _, repo := range retries {
-				var commits []*github.WeeklyCommitActivity
-				var mods []*github.WeeklyStats
-				var err error
-
-				if commitsMap[repo] == nil {
-					commits, err, _ = GetCommitActivity(ctx, ghClient, *org.Login, repo)
-					if err != nil {
-						log.Printf("Failed to get commit activity for %s. Error: %v\n", repo, err)
-						continue
-					}
-				} else {
-					commits = commitsMap[repo]
-				}
-
-				if modsMap[repo] == nil {
-					mods, err, _ = GetAdditionsDeletions(ctx, ghClient, *org.Login, repo)
-					if err != nil {
-						log.Printf("Failed to get additions/deletions for %s. Error: %v\n", repo, err)
-					}
-				} else {
-					mods = modsMap[repo]
-				}
-
-				saveRepoStats(ctx, fo, *org.Login, repo, commits, mods)
 			}
 		}
 
@@ -266,5 +130,101 @@ func RunGitlicCheck(ctx context.Context, cf config.Config, fo map[string]*os.Fil
 		log.Printf("Completed %s, %d of %d\n", *org.Login, i+1, len(orgs))
 	}
 	log.Print("\nCSVs are ready!\n")
+	return
+}
+
+// RunGitlicStatsReport will run a report across all repositories for the specified orgs that provides data on commits and lines of code
+func RunGitlicStatsReport(ctx context.Context, cf config.Config, fo map[string]*os.File) {
+	weekdays = [7]string{"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"}
+	ghClient := GetGHClient(ctx, cf)
+
+	if _, err := fo["stats.csv"].WriteString("Org,Repo,Commits in Last Year,Most Commits in a Day,Most Commits in a Week,Most Committable Day,Total Lines Added,Total Lines Removed,Most Lines Added in a Week,Most Lines Removed in a Week\n"); err != nil {
+		log.Printf("Initial save to stats CSV failed with %s\n", err)
+	}
+
+	log.Print("Working...\n\n")
+
+	orgs, err := GetSWOrgs(ctx, ghClient, cf)
+	if err != nil {
+		log.Fatalf("Failed to get orgs: %s", err.Error())
+		return
+	}
+
+	for i, org := range orgs {
+		repos, err := GetOrgRepositories(ctx, ghClient, org)
+		if err != nil {
+			log.Fatalf("Repositories.ListByOrg failed with %s\n", err)
+			return
+		}
+
+		var retries []string
+		commitsMap := make(map[string][]*github.WeeklyCommitActivity)
+		modsMap := make(map[string][]*github.WeeklyStats)
+
+		for _, repo := range repos {
+			commits, err, cmRetry := GetCommitActivity(ctx, ghClient, *org.Login, *repo.Name)
+			if err != nil {
+				log.Printf("Failed to get commit activity for %s. Error: %v\n", *repo.Name, err)
+			} else {
+				mods, err, mdRetry := GetAdditionsDeletions(ctx, ghClient, *org.Login, *repo.Name)
+				if err != nil {
+					log.Printf("Failed to get additions/deletions for %s. Error: %v\n", *repo.Name, err)
+				}
+
+				if cmRetry || mdRetry {
+					retries = append(retries, *repo.Name)
+
+					if !cmRetry {
+						commitsMap[*repo.Name] = commits
+					}
+					if !mdRetry {
+						modsMap[*repo.Name] = mods
+					}
+					continue
+				}
+
+				if _, err := fo["stats.csv"].WriteString(formatRepoStats(*org.Login, *repo.Name, commits, mods)); err != nil {
+					log.Printf("Failed to write stats for %s repository in %s org to stats.csv. Error: %v\n", *repo.Name, *org.Login, err)
+				}
+			}
+		}
+
+		// If the stats have not been calculated, wait, then try again
+		if len(retries) > 0 {
+			time.Sleep(3000 * time.Millisecond)
+
+			for _, repo := range retries {
+				var commits []*github.WeeklyCommitActivity
+				var mods []*github.WeeklyStats
+				var err error
+
+				if commitsMap[repo] == nil {
+					commits, err, _ = GetCommitActivity(ctx, ghClient, *org.Login, repo)
+					if err != nil {
+						log.Printf("Failed to get commit activity for %s. Error: %v\n", repo, err)
+						continue
+					}
+				} else {
+					commits = commitsMap[repo]
+				}
+
+				if modsMap[repo] == nil {
+					mods, err, _ = GetAdditionsDeletions(ctx, ghClient, *org.Login, repo)
+					if err != nil {
+						log.Printf("Failed to get additions/deletions for %s. Error: %v\n", repo, err)
+					}
+				} else {
+					mods = modsMap[repo]
+				}
+
+				if _, err := fo["stats.csv"].WriteString(formatRepoStats(*org.Login, repo, commits, mods)); err != nil {
+					log.Printf("Failed to write stats for %s repository in %s org to stats.csv. Error: %v\n", repo, *org.Login, err)
+				}
+			}
+		}
+
+		log.Printf("Completed %s, %d of %d\n", *org.Login, i+1, len(orgs))
+	}
+	log.Print("\nCSV is ready!\n")
 	return
 }
